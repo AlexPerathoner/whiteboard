@@ -14,9 +14,15 @@ import {
   type Viewport,
 } from '../canvas/viewport'
 import { DEFAULT_PENS, penSize, type Pen } from '../theme/palette'
+import { api, EMPTY_DOC, type BoardDoc } from '../api'
+import { navigate } from '../router'
 import { TextLayer } from './TextLayer'
+import { renderThumbnail } from './thumbnail'
 import { Toolbar, type PenFlyout, type Tool } from './Toolbar'
 import './board.css'
+
+/** Quiet period after the last edit before the board is written back. */
+const AUTOSAVE_MS = 1500
 
 /** Default text size in world units, matching MS's default text block. */
 const DEFAULT_FONT_SIZE = 24
@@ -52,7 +58,7 @@ const supportsRaw = 'onpointerrawupdate' in window
  */
 const MOVE_THRESHOLD_PX = 3
 
-export function Board() {
+export function Board({ boardId }: { boardId: string }) {
   const stageRef = useRef<HTMLDivElement>(null)
   const committedRef = useRef<HTMLCanvasElement>(null)
   const wetRef = useRef<HTMLCanvasElement>(null)
@@ -90,11 +96,45 @@ export function Board() {
   /** Set by the text layer when a text element takes the pointerdown. */
   const pendingTextHit = useRef<string | null>(null)
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false })
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle')
+  const dirty = useRef(false)
+  const saveTimer = useRef<number | null>(null)
+
+  const save = useCallback(async () => {
+    if (!dirty.current) return
+    dirty.current = false
+    setSaveState('saving')
+    const doc: BoardDoc = {
+      version: 1,
+      strokes: layer.current!.strokes,
+      texts: textsRef.current,
+    }
+    try {
+      await api.putDoc(boardId, doc)
+      const png = await renderThumbnail(doc.strokes, doc.texts)
+      if (png) await api.putThumb(boardId, png)
+      setSaveState('idle')
+    } catch (err) {
+      // Keep the board dirty so the next edit -- or leaving the page -- retries.
+      dirty.current = true
+      setSaveState('error')
+      console.error('autosave failed', err)
+    }
+  }, [boardId])
+
+  const markDirty = useCallback(() => {
+    dirty.current = true
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = window.setTimeout(save, AUTOSAVE_MS)
+  }, [save])
   const history = useRef<History | null>(null)
   if (!history.current) {
+    // Every mutation goes through the undo stack, so its change callback is
+    // also the single place that knows the document needs writing back.
     history.current = new History(200, () => {
       const h = history.current!
       setHistoryState({ canUndo: h.canUndo, canRedo: h.canRedo })
+      markDirty()
     })
   }
 
@@ -405,6 +445,48 @@ export function Board() {
     }
   }, [deleteSelection, drawOverlay])
 
+  // --- persistence ---------------------------------------------------------
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .getDoc(boardId)
+      .catch(() => EMPTY_DOC)
+      .then((doc) => {
+        if (cancelled) return
+        layer.current!.setStrokes(doc.strokes ?? [])
+        setTexts(doc.texts ?? [])
+        // Loading is not an edit, and the freshly loaded state is not undoable.
+        history.current!.clear()
+        dirty.current = false
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [boardId])
+
+  useEffect(() => {
+    // Closing the tab mid-debounce would otherwise drop the last edits.
+    const flush = () => {
+      if (!dirty.current) return
+      const doc: BoardDoc = {
+        version: 1,
+        strokes: layer.current!.strokes,
+        texts: textsRef.current,
+      }
+      navigator.sendBeacon(
+        `/api/boards/${boardId}/doc`,
+        new Blob([JSON.stringify(doc)], { type: 'application/json' }),
+      )
+    }
+    addEventListener('pagehide', flush)
+    return () => {
+      removeEventListener('pagehide', flush)
+      flush()
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+    }
+  }, [boardId])
+
   // --- pointer -------------------------------------------------------------
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -679,6 +761,12 @@ export function Board() {
           onEdit={(id) => setEditingId(id)}
         />
       </div>
+
+      <button className="back" onClick={() => navigate('/')} title="All whiteboards">
+        ← <span className={`save save-${saveState}`}>
+          {saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : 'Saved'}
+        </span>
+      </button>
 
       <Toolbar
         tool={tool}

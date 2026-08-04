@@ -4,13 +4,18 @@ Plan: `~/.claude/plans/fancy-stirring-lighthouse.md`
 
 ```bash
 npm install
-npm run dev
+npm run dev     # Vite on :5173 + Fastify on :3001, /api proxied
 ```
 
+- `http://localhost:5173/` — dashboard; `/b/:id` — a board
 - `http://localhost:5173/spike.html` — ink spike (phase 1).
   Add `?raw=0` to force the `pointermove` + `getCoalescedEvents()` fallback
   that Chrome otherwise never takes.
-- `http://localhost:5173/` — the app (canvas core + ink)
+
+For a single-process run: `npm run build && npm start` serves the built
+frontend and the API together on `:3001`. State lives under `data/`
+(`whiteboard.db`, `docs/<id>.json`, `thumbs/<id>.png`) — one directory to
+mount as a volume, and `DATA_DIR` moves it.
 
 ## What MS Whiteboard actually does (measured, not guessed)
 
@@ -295,3 +300,42 @@ but is not symmetric with the canvas layer.
 
 Note: React delegates `onBlur` from `focusout`, so a dispatched `blur` event
 never reaches it — tests must dispatch `focusout`.
+
+## Phase 6 — backend, dashboard, folders, autosave
+
+`server/` (Fastify + better-sqlite3), `src/api.ts`, `src/router.ts`,
+`src/dashboard/`, `src/board/thumbnail.ts`.
+
+SQLite holds board and folder metadata; documents and thumbnails are files
+under `data/`. Boards keep a `folder_id` with `ON DELETE SET NULL`, so deleting
+a folder moves its boards back to the root instead of destroying them —
+verified end to end, not just declared in the schema.
+
+Autosave hangs off the undo stack's change callback: every mutation already
+goes through `History`, so that is the one place that knows the document is
+dirty. Writes are debounced 1500 ms, and a `pagehide` handler flushes through
+`sendBeacon` so closing the tab mid-debounce cannot drop the last edits. A
+failed save leaves the board dirty so the next edit retries, and the state
+shows next to the back button.
+
+The document is written whole rather than as an op log. That is correct and
+far simpler for one user; op-sync only becomes necessary when two clients can
+edit one board at once.
+
+Routing is ~20 lines over `history.pushState` — two routes and no query
+strings did not justify a router dependency. `<Board key={boardId}>` remounts
+on navigation, so no stale document or undo stack survives.
+
+**No `prompt`/`confirm` anywhere.** Rename, move-to-folder and both deletes are
+inline: native dialogs block the entire page (and any automation driving it),
+and MS renames in place regardless.
+
+Verified: full API surface via curl; create board → ink → text → autosave →
+`GET /doc` shows both; reload restores strokes and text with an empty undo
+stack; thumbnail served as PNG and cache-busted per save; folder create,
+filter, move-between-folders; folder delete returning its boards to the root;
+two-step board delete agreeing with the server listing.
+
+One trap worth recording: a Fastify handler that returns `reply.code(204)`
+*without* `.send()` never responds — the request just hangs. Four routes had
+it.

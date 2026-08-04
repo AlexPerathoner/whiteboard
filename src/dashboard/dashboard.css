@@ -1,0 +1,164 @@
+.dashboard {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  font: 13px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: #1f1f1f;
+  background: #faf9f8;
+}
+
+.dashboard header {
+  flex: 0 0 auto;
+  padding: 14px 20px;
+  background: #3b3a39;
+  color: #fff;
+}
+.dashboard header h1 { margin: 0; font-size: 15px; font-weight: 600; }
+
+.dashboard .body { flex: 1; display: flex; min-height: 0; }
+
+.folders {
+  flex: 0 0 220px;
+  padding: 16px 12px;
+  border-right: 1px solid #e1dfdd;
+  overflow-y: auto;
+}
+.folders button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.folders button:hover { background: #f3f2f1; }
+.folders button.on { background: #e8e0f4; font-weight: 600; }
+.folder-row { display: flex; align-items: center; gap: 2px; }
+.folder-row .folder-del { width: 26px; flex: 0 0 26px; text-align: center; opacity: 0; }
+.folder-row:hover .folder-del { opacity: 0.6; }
+.new-folder { margin-top: 8px; color: #5b318d; }
+
+.dashboard main { flex: 1; padding: 20px; overflow-y: auto; }
+.dashboard .error {
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: #fde7e9;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e1dfdd;
+  border-radius: 6px;
+  background: #fff;
+  overflow: visible;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.card:hover { box-shadow: 0 2px 8px rgb(0 0 0 / 12%); }
+
+.card.new {
+  align-items: center;
+  justify-content: center;
+  min-height: 178px;
+  gap: 10px;
+  border: 0;
+  background: #0f6cbd;
+  color: #fff;
+  font-weight: 600;
+}
+.card.new .plus {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 22%);
+  font-size: 24px;
+}
+
+.card .thumb {
+  height: 130px;
+  border-radius: 6px 6px 0 0;
+  background: #fff;
+  overflow: hidden;
+}
+.card .thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.card .meta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid #f3f2f1;
+}
+.card .titles { flex: 1; min-width: 0; }
+.card .titles strong { display: block; font-weight: 600; }
+.card .titles span { color: #605e5c; font-size: 12px; }
+
+.card .more {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.card .more:hover { background: #f3f2f1; }
+
+.card .menu {
+  position: absolute;
+  right: 8px;
+  bottom: 36px;
+  z-index: 2;
+  min-width: 150px;
+  padding: 4px;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
+}
+.card .menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.card .menu button:hover { background: #f3f2f1; }
+.card .menu .danger { color: #c10051; }
+
+.inline-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #5b318d;
+  border-radius: 3px;
+  font: inherit;
+}
+
+.folders .confirm { width: auto; flex: 0 0 auto; color: #c10051; font-weight: 600; }
+
+.card .menu button:disabled { opacity: 0.4; cursor: default; }
+.card .menu button:disabled:hover { background: transparent; }
+.card .menu .hint {
+  display: block;
+  padding: 6px 10px;
+  color: #605e5c;
+  font-size: 12px;
+}
