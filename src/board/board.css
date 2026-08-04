@@ -1,0 +1,287 @@
+.board {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f5;
+  font: 13px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+  color: #1f1f1f;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  /* Both required, or the browser claims the gesture and ink stutters. */
+  touch-action: none;
+  overscroll-behavior: none;
+}
+.stage.tool-pen { cursor: crosshair; }
+.stage.tool-select { cursor: default; }
+.stage.tool-text { cursor: text; }
+
+/* --- text ---------------------------------------------------------------- */
+
+.text-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.text-item {
+  position: absolute;
+  min-width: 8px;
+  /* No max-width here -- it comes from the item's world width, converted to
+     screen, so wrapping does not change with zoom. */
+  padding: 0;
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: auto;
+  outline: none;
+}
+
+.text-item.selected { box-shadow: 0 0 0 1px #5B318D; }
+.text-item.editing {
+  box-shadow: 0 0 0 1px #5B318D;
+  cursor: text;
+  user-select: text;
+}
+/* Give an empty box something to click while it is being typed into. */
+.text-item.editing:empty::before {
+  content: " ";
+  white-space: pre;
+}
+.stage.tool-hand { cursor: grab; }
+.stage.tool-hand:active { cursor: grabbing; }
+
+.stage canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.toolbar,
+.zoom,
+.undo-pill,
+.pen-tray,
+.pen-popup {
+  position: absolute;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 14%), 0 0 2px rgb(0 0 0 / 12%);
+}
+
+.toolbar,
+.zoom,
+.undo-pill,
+.pen-tray {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+}
+
+.toolbar {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* MS keeps undo in its own pill to the left of the tool pill. */
+.undo-pill {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-320px);
+}
+
+.zoom { bottom: 20px; right: 20px; }
+
+/* The tray sits directly above the pen button. */
+.pen-tray {
+  bottom: 66px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Direct children only -- the popup lives inside the tray and sizes its own
+   controls. */
+.toolbar button,
+.zoom button,
+.undo-pill button,
+.pen-tray > button {
+  position: relative;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.toolbar button:hover:not(:disabled),
+.zoom button:hover,
+.undo-pill button:hover:not(:disabled),
+.pen-tray > button:hover:not(:disabled) { background: #f0f0f0; }
+.toolbar button.on,
+.pen-tray > button.on { background: #e8e0f4; }
+button:disabled { opacity: 0.35; cursor: default; }
+
+/* Colour dot under the pen tool, mirroring the selected pen. */
+.toolbar .pen-button .dot {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.pen-tray .tray-pen { width: 34px; }
+.pen-tray .tray-pen .nib {
+  display: block;
+  width: 8px;
+  height: 20px;
+  margin: 0 auto;
+  border-radius: 2px 2px 4px 4px;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
+}
+.pen-tray .tray-pen.highlighter .nib {
+  width: 14px;
+  clip-path: none;
+  border-radius: 2px;
+  opacity: 0.75;
+}
+
+.zoom .label {
+  min-width: 52px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- pen settings popup ------------------------------------------------- */
+
+.pen-popup {
+  left: 50%;
+  bottom: 52px;
+  transform: translateX(-50%);
+  width: 192px;
+  padding: 12px;
+}
+
+.pen-popup .slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pen-popup .slider-row input[type='range'] { flex: 1; min-width: 0; }
+.pen-popup .slider-row b {
+  min-width: 20px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Thickness track tapers left-to-right, like the MS wedge. */
+.pen-popup .wedge {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 16px;
+}
+.pen-popup .wedge::before {
+  content: "";
+  position: absolute;
+  inset: 0 0;
+  background: #1f1f1f;
+  clip-path: polygon(0 44%, 100% 12%, 100% 88%, 0 56%);
+}
+.pen-popup input.thickness {
+  appearance: none;
+  position: relative;
+  width: 100%;
+  height: 16px;
+  margin: 0;
+  background: transparent;
+}
+/* Opacity track: checkerboard showing through to the pen colour. */
+.pen-popup input.opacity {
+  appearance: none;
+  height: 12px;
+  border-radius: 2px;
+  background:
+    linear-gradient(to right, transparent, var(--swatch, #1f1f1f)),
+    repeating-conic-gradient(#d0d0d0 0% 25%, #fff 0% 50%) 0 0 / 8px 8px;
+}
+.pen-popup input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #1f1f1f;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+.pen-popup .opacity-box {
+  width: 46px;
+  padding: 2px 4px;
+  border: 1px solid #8a8886;
+  border-radius: 2px;
+  font: inherit;
+  text-align: center;
+  appearance: textfield;
+}
+.pen-popup .opacity-box::-webkit-inner-spin-button,
+.pen-popup .opacity-box::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.pen-popup .swatch-row,
+.pen-popup .swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  place-items: center;
+}
+.pen-popup .swatch-row.recent {
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.pen-popup .swatch-grid { margin-bottom: 10px; }
+
+.pen-popup .swatch {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.pen-popup .swatch.on {
+  box-shadow: 0 0 0 2px #fff inset, 0 0 0 2px #1f1f1f;
+}
+.pen-popup .swatch.more {
+  background: #fff;
+  border: 1px dashed #8a8886;
+  line-height: 1;
+}
+
+.pen-popup .arrow-row {
+  display: flex;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid #e0e0e0;
+}
+.pen-popup .arrow-row button {
+  flex: 1;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.pen-popup .arrow-row button.on { background: #f0f0f0; }
+.pen-popup .arrow-row .close { flex: 0 0 28px; }
