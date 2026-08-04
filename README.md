@@ -17,6 +17,11 @@ frontend and the API together on `:3001`. State lives under `data/`
 (`whiteboard.db`, `docs/<id>.json`, `thumbs/<id>.png`) — one directory to
 mount as a volume, and `DATA_DIR` moves it.
 
+Note: the server serves `dist/` whenever that directory exists. Once you have
+run a build, `:3001` keeps serving *that* bundle even while `:5173` serves
+fresh code — so a stale `dist/` looks like changes not taking effect. Delete it
+or rebuild.
+
 ## What MS Whiteboard actually does (measured, not guessed)
 
 MS Whiteboard renders ink as **SVG outline fills** — `<path fill="…">` with no
@@ -368,7 +373,18 @@ trusted LAN. Anything reachable from the internet should sit behind a reverse
 proxy terminating TLS — this app does not do TLS itself.
 
 Verified: 401 with no credentials, 401 on a wrong password, 401 on a wrong
-username, 200 with the right pair, and the comparison is constant-time.
+username, 200 with the right pair, and the comparison is constant-time. The
+gate covers the frontend too — an unauthenticated `/` returns 401 *with* a
+`WWW-Authenticate` header, so the browser prompts and then sends credentials
+on the asset requests (checked: asset 401 without credentials, 200 with).
+
+**Known conflict with the autosave beacon.** The `pagehide` flush uses
+`navigator.sendBeacon`, which cannot carry an `Authorization` header. With
+`APP_PASSWORD` set, a close-tab flush 401s silently and those last edits are
+lost — the exact case the beacon exists to prevent. Beacons *do* send cookies,
+so fixing it properly means a cookie session rather than Basic auth. Until
+then: with the password gate on, leave a board through the back button (which
+lets the normal debounced save run) rather than by closing the tab mid-edit.
 
 ### Not verified
 
