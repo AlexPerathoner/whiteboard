@@ -339,3 +339,42 @@ two-step board delete agreeing with the server listing.
 One trap worth recording: a Fastify handler that returns `reply.code(204)`
 *without* `.send()` never responds — the request just hangs. Four routes had
 it.
+
+## Phase 7 — packaging
+
+`Dockerfile`, `docker-compose.yml`.
+
+```bash
+docker compose up -d          # http://localhost:3001
+```
+
+Two stages sharing one base image, because `better-sqlite3` is a native module
+and its compiled binding has to match the runtime's libc. The build stage adds
+a toolchain, builds the frontend, then `npm prune --omit=dev` so build-only
+packages never reach the runtime image. There is no separate server compile
+step — Node strips the types in place, so the only build artefact is the
+frontend bundle.
+
+All state is under `/data` (SQLite db, board documents, thumbnails), mounted as
+a named volume. `DATA_DIR` relocates it.
+
+### Optional password
+
+Set `APP_PASSWORD` (and optionally `APP_USER`, default `whiteboard`) to require
+HTTP Basic auth on every request. It is off by default.
+
+**Basic auth is base64, not encryption.** It is appropriate for a board on a
+trusted LAN. Anything reachable from the internet should sit behind a reverse
+proxy terminating TLS — this app does not do TLS itself.
+
+Verified: 401 with no credentials, 401 on a wrong password, 401 on a wrong
+username, 200 with the right pair, and the comparison is constant-time.
+
+### Not verified
+
+**The image has never been built** — no Docker daemon was running on this
+machine. What *was* verified is the process the container runs: `npm start`
+serving the API, the SPA fallback and the root all returning 200 in a single
+process, and that every module the server imports is a production dependency,
+so `npm prune --omit=dev` cannot break it. Run `docker compose up --build` once
+to close the gap.

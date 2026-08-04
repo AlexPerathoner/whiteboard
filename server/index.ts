@@ -1,7 +1,8 @@
 import Fastify from 'fastify'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { registerRoutes } from './routes.js'
+import { registerAuth } from './auth.ts'
+import { registerRoutes } from './routes.ts'
 
 const PORT = Number(process.env.PORT ?? 3001)
 const HOST = process.env.HOST ?? '0.0.0.0'
@@ -19,6 +20,7 @@ app.addContentTypeParser('image/png', { parseAs: 'buffer' }, (_req, body, done) 
   done(null, body),
 )
 
+const guarded = registerAuth(app)
 await registerRoutes(app)
 
 // In production the same process serves the built frontend, so a self-host is
@@ -33,4 +35,7 @@ if (existsSync(DIST)) {
 }
 
 await app.listen({ port: PORT, host: HOST })
-console.log(`whiteboard server on http://${HOST}:${PORT}`)
+console.log(
+  `whiteboard server on http://${HOST}:${PORT}` +
+    (guarded ? ' (password protected)' : ' (open — set APP_PASSWORD to require a login)'),
+)

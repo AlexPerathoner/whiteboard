@@ -1,0 +1,19 @@
+services:
+  whiteboard:
+    build: .
+    image: whiteboard:latest
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      # Everything mutable lives here: SQLite db, board documents, thumbnails.
+      - whiteboard-data:/data
+    environment:
+      # Uncomment to require a login. Basic auth is not encrypted, so only do
+      # this on a trusted LAN, or put a TLS-terminating proxy in front.
+      # APP_USER: whiteboard
+      # APP_PASSWORD: change-me
+      LOG_LEVEL: warn
+
+volumes:
+  whiteboard-data:

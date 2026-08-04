@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { db, docPath, thumbPath, type BoardRow, type FolderRow } from './db.js'
+import { db, docPath, thumbPath, type BoardRow, type FolderRow } from './db.ts'
 
 const EMPTY_DOC = { version: 1, strokes: [], texts: [] }
 
