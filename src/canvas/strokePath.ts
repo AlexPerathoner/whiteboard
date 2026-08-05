@@ -132,3 +132,36 @@ export function outlineBounds(outline: number[][]): [number, number, number, num
   }
   return [x0, y0, x1, y1]
 }
+
+/**
+ * The stroke's spine as a plain polyline.
+ *
+ * With constant width (`thinning: 0`, which is what MS does) the exact shape of
+ * the ink is this polyline stroked with round joins and caps -- the same
+ * `A r,r` arc geometry MS emits, with r = half the width. Filling a computed
+ * outline only approximates that, and loses area where the outline
+ * self-intersects on a tight turn, which shows up as bites out of the edge.
+ */
+export function polylinePath(pts: InkPoint[]): Path2D {
+  const path = new Path2D()
+  if (pts.length === 0) return path
+  path.moveTo(pts[0][0], pts[0][1])
+  // A zero-length segment with a round cap is how Canvas2D draws a dot, so a
+  // single-point stroke still leaves a mark.
+  if (pts.length === 1) path.lineTo(pts[0][0], pts[0][1])
+  for (let i = 1; i < pts.length; i++) path.lineTo(pts[i][0], pts[i][1])
+  return path
+}
+
+/** Bounds of a polyline stroked at `width`, in world units. */
+export function polylineBounds(pts: InkPoint[], width: number): [number, number, number, number] {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  for (const [x, y] of pts) {
+    if (x < x0) x0 = x
+    if (y < y0) y0 = y
+    if (x > x1) x1 = x
+    if (y > y1) y1 = y
+  }
+  const r = width / 2
+  return [x0 - r, y0 - r, x1 + r, y1 + r]
+}

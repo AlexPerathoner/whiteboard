@@ -1,4 +1,4 @@
-import { paintStroke, strokePath } from './inkEngine'
+import { applyStrokeStyle, isConstantWidth, paintStroke, strokePath } from './inkEngine'
 import type { InkTuning, Stroke } from './types'
 import {
   applyViewport,
@@ -119,22 +119,32 @@ export class CommittedLayer {
   hitTest(wx: number, wy: number, toleranceWorld = 0): Stroke | null {
     const ctx = scratchCtx()
     const t = toleranceWorld
-    // Thin strokes are hard to land on exactly; probe a small cross.
-    const probes: [number, number][] = t > 0
-      ? [
-          [wx, wy],
-          [wx - t, wy],
-          [wx + t, wy],
-          [wx, wy - t],
-          [wx, wy + t],
-        ]
-      : [[wx, wy]]
+    const constant = isConstantWidth(this.tuning)
+    // Thin strokes are hard to land on exactly; probe a small cross. Under
+    // constant width the tolerance is simply a fatter test line instead.
+    const probes: [number, number][] =
+      t > 0 && !constant
+        ? [
+            [wx, wy],
+            [wx - t, wy],
+            [wx + t, wy],
+            [wx, wy - t],
+            [wx, wy + t],
+          ]
+        : [[wx, wy]]
 
     const probe: Rect = [wx - t, wy - t, wx + t, wy + t]
     for (let i = this.strokes.length - 1; i >= 0; i--) {
       const s = this.strokes[i]
       if (!boundsIntersect(probe, s.bounds)) continue
       const path = strokePath(s, this.tuning, this.paths)
+      if (constant) {
+        // The cached path is the spine, so the ink's extent is the stroked
+        // width -- widened by the tolerance rather than probed around.
+        applyStrokeStyle(ctx, s.size + t * 2)
+        if (ctx.isPointInStroke(path, wx, wy)) return s
+        continue
+      }
       for (const [px, py] of probes) {
         if (ctx.isPointInPath(path, px, py)) return s
       }

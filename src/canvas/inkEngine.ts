@@ -1,4 +1,4 @@
-import { buildOutlinePath, outlineFor } from './strokePath'
+import { buildOutlinePath, outlineFor, polylineBounds, polylinePath } from './strokePath'
 import { DEFAULT_TUNING, type InkPoint, type InkStyle, type InkTuning, type Stroke } from './types'
 import {
   applyViewport,
@@ -215,21 +215,32 @@ export class InkEngine {
     if (!style) return
     const n = this.spine.length
 
+    const constant = isConstantWidth(this.tuning)
+
     if (n - this.frozenCount > FREEZE_EVERY) {
       const count = n - 1
-      this.frozenPath = buildOutlinePath(
-        outlineFor(this.spine.slice(0, count), style.size, this.tuning, false),
-      ).path
+      const prefix = this.spine.slice(0, count)
+      this.frozenPath = constant
+        ? polylinePath(prefix)
+        : buildOutlinePath(outlineFor(prefix, style.size, this.tuning, false)).path
       this.frozenCount = count
     }
 
     // One point of overlap: the prefix's end cap and the tail's start cap are
     // round and concentric, so the union has no notch at the join.
     const tail = this.spine.slice(this.frozenPath ? Math.max(0, this.frozenCount - 1) : 0)
-    const outline = outlineFor(tail, style.size, this.tuning, last)
-    if (outline.length === 0) return
-
-    const { path: tailPath, bounds } = buildOutlinePath(outline)
+    let tailPath: Path2D
+    let bounds: Rect
+    if (constant) {
+      tailPath = polylinePath(tail)
+      bounds = polylineBounds(tail, style.size)
+    } else {
+      const outline = outlineFor(tail, style.size, this.tuning, last)
+      if (outline.length === 0) return
+      const built = buildOutlinePath(outline)
+      tailPath = built.path
+      bounds = built.bounds
+    }
     const whole = new Path2D()
     if (this.frozenPath) whole.addPath(this.frozenPath)
     whole.addPath(tailPath)
@@ -254,8 +265,14 @@ export class InkEngine {
     this.applyTransform(target)
     target.globalAlpha = 1
     target.globalCompositeOperation = 'source-over'
-    target.fillStyle = style.color
-    target.fill(whole)
+    if (constant) {
+      target.strokeStyle = style.color
+      applyStrokeStyle(target, style.size)
+      target.stroke(whole)
+    } else {
+      target.fillStyle = style.color
+      target.fill(whole)
+    }
     target.restore()
 
     if (this.useBuffer) this.blit(dirty, style)
@@ -310,7 +327,10 @@ export class InkEngine {
 
     const style = this.style
     const pts = this.spine
-    const { path, bounds } = buildOutlinePath(outlineFor(pts, style.size, this.tuning, true))
+    const constantWidth = isConstantWidth(this.tuning)
+    const { path, bounds } = constantWidth
+      ? { path: polylinePath(pts), bounds: polylineBounds(pts, style.size) }
+      : buildOutlinePath(outlineFor(pts, style.size, this.tuning, true))
     const stroke: Stroke = {
       id: crypto.randomUUID(),
       type: 'stroke',
@@ -338,6 +358,22 @@ export class InkEngine {
 }
 
 /**
+ * Constant width means the ink's exact shape is the spine stroked with round
+ * joins and caps. Only a pressure-varying stroke needs a computed outline.
+ */
+export function isConstantWidth(tuning: InkTuning) {
+  return tuning.thinning === 0
+}
+
+/** Applies the line style that reproduces MS's round joins and caps. */
+export function applyStrokeStyle(ctx: CanvasRenderingContext2D, width: number) {
+  ctx.lineWidth = width
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  ctx.miterLimit = 1
+}
+
+/**
  * Outline path for a finished stroke, cached in *world* space: `size` is in
  * world units, so the outline is zoom-independent and never needs rebuilding
  * on pan or zoom.
@@ -349,7 +385,9 @@ export function strokePath(
 ): Path2D {
   const hit = cache?.get(stroke.id)
   if (hit) return hit
-  const { path } = buildOutlinePath(outlineFor(stroke.pts, stroke.size, tuning, true))
+  const path = isConstantWidth(tuning)
+    ? polylinePath(stroke.pts)
+    : buildOutlinePath(outlineFor(stroke.pts, stroke.size, tuning, true)).path
   cache?.set(stroke.id, path)
   return path
 }
@@ -370,7 +408,13 @@ export function paintStroke(
   if (stroke.tool === 'highlighter' && highlighterBlend === 'multiply') {
     ctx.globalCompositeOperation = 'multiply'
   }
-  ctx.fillStyle = stroke.color
-  ctx.fill(path)
+  if (isConstantWidth(tuning)) {
+    ctx.strokeStyle = stroke.color
+    applyStrokeStyle(ctx, stroke.size)
+    ctx.stroke(path)
+  } else {
+    ctx.fillStyle = stroke.color
+    ctx.fill(path)
+  }
   ctx.restore()
 }
