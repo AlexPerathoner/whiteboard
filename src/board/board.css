@@ -311,3 +311,5 @@ button:disabled { opacity: 0.35; cursor: default; }
 .board .back:hover { background: #f3f2f1; }
 .board .save { font-size: 12px; color: #605e5c; }
 .board .save-error { color: #c10051; font-weight: 600; }
+
+.stage.tool-eraser { cursor: none; }

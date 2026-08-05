@@ -69,6 +69,12 @@ export class InkEngine {
   private frozenCount = 0
   /** Region touched by the previous sample, so the old tip can be erased. */
   private lastDirty: Rect | null = null
+  /**
+   * Spine index the straight-edge constraint is anchored to, or null when the
+   * stroke is free. Everything before it stays as drawn; everything after
+   * collapses to a single segment.
+   */
+  private lineAnchor: number | null = null
   /** Last unfiltered pointer position, so the stroke can end exactly there. */
   private lastRaw: [number, number] | null = null
   private style: InkStyle | null = null
@@ -110,6 +116,36 @@ export class InkEngine {
     this.tuning = tuning
   }
 
+  /**
+   * Straight-edge constraint, as holding shift does in MS Whiteboard.
+   *
+   * Anchored where it was switched on rather than at the stroke's origin, so
+   * freehand drawn before the key went down is preserved and only the run
+   * after it snaps to a line.
+   */
+  setLineConstraint(on: boolean) {
+    if (!this.drawing) return
+    if (on) {
+      if (this.lineAnchor !== null) return
+      this.lineAnchor = this.spine.length - 1
+      // The frozen prefix must not reach past the anchor, or collapsing the
+      // tail would leave the frozen copy of it on the canvas.
+      if (this.frozenCount > this.lineAnchor) {
+        this.frozenPath = null
+        this.frozenCount = 0
+      }
+    } else if (this.lineAnchor !== null) {
+      this.lineAnchor = null
+      // The collapsed segment becomes ordinary spine again; freehand resumes
+      // from wherever the line ended.
+      this.lastTime = performance.now()
+    }
+  }
+
+  get hasLineConstraint() {
+    return this.lineAnchor !== null
+  }
+
   private applyTransform(ctx: CanvasRenderingContext2D) {
     applyViewport(ctx, this.vp, this.dpr)
   }
@@ -133,6 +169,7 @@ export class InkEngine {
     this.frozenPath = null
     this.frozenCount = 0
     this.lastDirty = null
+    this.lineAnchor = null
     this.lastRaw = [worldX, worldY]
     this.pressure = 0.5
     this.lastTime = time
@@ -179,6 +216,20 @@ export class InkEngine {
     if (rawDist < 0.15 / this.vp.z) return
 
     this.lastRaw = [worldX, worldY]
+
+    if (this.lineAnchor !== null) {
+      // One moving point after the anchor: the run is a straight segment, and
+      // no filtering applies because there is nothing to smooth.
+      this.spine.length = this.lineAnchor + 1
+      this.spine.push([worldX, worldY, this.pressure])
+      this.stats.points++
+      this.drawTail(false)
+      const dt = performance.now() - t0
+      this.stats.lastSampleMs = dt
+      if (dt > this.stats.worstSampleMs) this.stats.worstSampleMs = dt
+      return
+    }
+
     const prev = this.spine[this.spine.length - 1]
     const k = 1 - Math.min(0.95, Math.max(0, this.tuning.streamline))
     const x = prev[0] + (worldX - prev[0]) * k

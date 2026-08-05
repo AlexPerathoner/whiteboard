@@ -31,7 +31,7 @@ const DEFAULT_TEXT_WIDTH = 480
 /** Pens whose colours seed the "recent" row in the settings popup. */
 const RECENT_SLOTS = DEFAULT_PENS.slice(0, 3)
 
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', p: 'pen', t: 'text' }
+const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', p: 'pen', e: 'eraser', t: 'text' }
 
 function penStyle(pen: Pen): InkStyle {
   return { color: pen.color, size: penSize(pen), opacity: pen.opacity, tool: pen.tool }
@@ -41,6 +41,7 @@ type Drag =
   | { kind: 'ink' }
   | { kind: 'pan'; lastX: number; lastY: number }
   | { kind: 'marquee'; start: [number, number]; rect: Rect }
+  | { kind: 'erase'; removed: { stroke: Stroke; index: number }[] }
   | {
       kind: 'move'
       startWorld: [number, number]
@@ -57,6 +58,9 @@ const supportsRaw = 'onpointerrawupdate' in window
  * jitter during a shift-click turns into a 1px move on the undo stack.
  */
 const MOVE_THRESHOLD_PX = 3
+
+/** Radius of the stroke eraser, in screen pixels. */
+const ERASER_RADIUS_PX = 12
 
 /** Capture is an optimisation for drags, not a requirement; it throws if the
  *  pointer has already been released. */
@@ -189,8 +193,8 @@ export function Board({ boardId }: { boardId: string }) {
   }, [textBounds])
 
   const drawOverlay = useCallback(
-    (marquee: Rect | null = null) => {
-      overlay.current?.draw(vp.current, selectionBounds(), marquee)
+    (marquee: Rect | null = null, eraser: [number, number] | null = null) => {
+      overlay.current?.draw(vp.current, selectionBounds(), marquee, eraser, ERASER_RADIUS_PX)
     },
     [selectionBounds],
   )
@@ -241,6 +245,19 @@ export function Board({ boardId }: { boardId: string }) {
         list.map((t) => (ids.has(t.id) ? { ...t, x: t.x + dx, y: t.y + dy } : t)),
       )
     }
+  }, [])
+
+  /**
+   * Stroke eraser, as MS does by default: touching any part of a stroke
+   * removes the whole thing rather than cutting a hole in it.
+   */
+  const eraseAt = useCallback((wx: number, wy: number, d: { removed: { stroke: Stroke; index: number }[] }) => {
+    const l = layer.current!
+    const hit = l.hitTest(wx, wy, ERASER_RADIUS_PX / vp.current.z)
+    if (!hit) return
+    // Index captured before removal so undo restores the original depth.
+    d.removed.push({ stroke: hit, index: l.indexOfStroke(hit.id) })
+    l.remove(new Set([hit.id]))
   }, [])
 
   const deleteSelection = useCallback(() => {
@@ -397,6 +414,10 @@ export function Board({ boardId }: { boardId: string }) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      // Shift straightens the run being drawn -- MS's "ruler on" shortcut.
+      if (e.key === 'Shift' && drag.current?.kind === 'ink') {
+        engine.current?.setLineConstraint(true)
+      }
       const el = e.target as HTMLElement | null
       // Checked before the space handling: a space typed into a text box is a
       // space, not the pan modifier.
@@ -448,6 +469,7 @@ export function Board({ boardId }: { boardId: string }) {
     }
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') spaceHeld.current = false
+      if (e.key === 'Shift') engine.current?.setLineConstraint(false)
     }
     // Losing the window mid-press means the keyup never arrives, which would
     // leave every later click behaving as a pan.
@@ -533,6 +555,15 @@ export function Board({ boardId }: { boardId: string }) {
     // here so it can never leak into a later press.
     const textHit = pendingTextHit.current
     pendingTextHit.current = null
+
+    if (tool === 'eraser') {
+      capturePointer(stage, e.pointerId)
+      const d = { kind: 'erase' as const, removed: [] }
+      drag.current = d
+      eraseAt(wx, wy, d)
+      drawOverlay(null, [e.clientX - ox, e.clientY - oy])
+      return
+    }
 
     if (tool === 'text') {
       // Placing text is a click, not a drag: taking pointer capture here would
@@ -629,6 +660,16 @@ export function Board({ boardId }: { boardId: string }) {
       syncViewport()
       return
     }
+    if (d.kind === 'erase') {
+      const [ox, oy] = origin.current
+      const sx = e.clientX - ox
+      const sy = e.clientY - oy
+      const [wx, wy] = screenToWorld(vp.current, sx, sy)
+      eraseAt(wx, wy, d)
+      drawOverlay(null, [sx, sy])
+      return
+    }
+
     if (d.kind === 'marquee' || d.kind === 'move') {
       const [ox, oy] = origin.current
       const [wx, wy] = screenToWorld(vp.current, e.clientX - ox, e.clientY - oy)
@@ -663,6 +704,21 @@ export function Board({ boardId }: { boardId: string }) {
     const d = drag.current
     drag.current = null
     const l = layer.current!
+
+    if (d?.kind === 'erase') {
+      drawOverlay()
+      if (d.removed.length === 0) return
+      const ids = new Set(d.removed.map((x) => x.stroke.id))
+      const removed = d.removed
+      // Already gone from the live drag, so `do` is a no-op the first time and
+      // only matters on redo -- one command per drag, not per stroke.
+      history.current!.push({
+        label: 'erase',
+        do: () => l.remove(ids),
+        undo: () => l.insertAt(removed),
+      })
+      return
+    }
 
     if (d?.kind === 'marquee') {
       const picked = l.strokesIn(d.rect)

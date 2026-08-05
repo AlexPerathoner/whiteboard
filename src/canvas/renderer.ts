@@ -180,6 +180,10 @@ export class CommittedLayer {
     this.invalidate()
   }
 
+  indexOfStroke(id: string) {
+    return this.strokes.findIndex((s) => s.id === id)
+  }
+
   /** Restores strokes at their original indices, so z-order survives undo. */
   insertAt(entries: { stroke: Stroke; index: number }[]) {
     const sorted = [...entries].sort((a, b) => a.index - b.index)

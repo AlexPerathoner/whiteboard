@@ -38,7 +38,13 @@ export class OverlayLayer {
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
   }
 
-  draw(vp: Viewport, selection: Rect | null, marquee: Rect | null) {
+  draw(
+    vp: Viewport,
+    selection: Rect | null,
+    marquee: Rect | null,
+    eraser: [number, number] | null = null,
+    eraserRadius = 12,
+  ) {
     const ctx = this.ctx
     this.clear()
     // Screen space: chrome keeps a constant 1px weight at every zoom.
@@ -73,6 +79,20 @@ export class OverlayLayer {
       ctx.lineWidth = 1
       ctx.fillRect(x, y, w, h)
       ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.round(w), Math.round(h))
+      ctx.restore()
+    }
+
+    if (eraser) {
+      // Drawn rather than set as a CSS cursor so it scales with the tool and
+      // stays visible over dark ink.
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(eraser[0], eraser[1], eraserRadius, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)'
+      ctx.strokeStyle = '#605e5c'
+      ctx.lineWidth = 1
+      ctx.fill()
+      ctx.stroke()
       ctx.restore()
     }
   }

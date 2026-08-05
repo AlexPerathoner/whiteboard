@@ -1,7 +1,7 @@
 import { penSize, type Pen } from '../theme/palette'
 import { PenSettingsPopup } from './PenSettingsPopup'
 
-export type Tool = 'select' | 'hand' | 'pen' | 'text'
+export type Tool = 'select' | 'hand' | 'pen' | 'eraser' | 'text'
 
 /** Pen flyout state. The settings popup renders inside the tray, so this is
  *  a ladder, not two independent booleans. */
@@ -129,6 +129,13 @@ export function Toolbar(props: Props) {
         >
           ✒️
           <span className="dot" style={{ background: pen.color }} />
+        </button>
+        <button
+          className={tool === 'eraser' ? 'on' : ''}
+          onClick={() => props.onTool('eraser')}
+          title="Eraser (E) — removes whole strokes"
+        >
+          🧽
         </button>
         <Placeholders items={BEFORE_TEXT} />
         <button
