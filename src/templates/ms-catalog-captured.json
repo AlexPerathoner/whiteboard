@@ -1,0 +1,110 @@
+{
+  "_source": "Captured from the live Microsoft Whiteboard template picker (whiteboard.cloud.microsoft) on 2026-08-05, by reading the panel's aria-labels. This is the authoritative list of template NAMES and CATEGORIES. Layout geometry is NOT included -- MS only reveals that when a template is inserted onto a board.",
+  "_why": "The picker stops working on 2026-08-22. This file preserves what the catalogue actually contained, so catalog.ts can be corrected against reality rather than against guesses.",
+  "categories": {
+    "Recommended": [
+      "Affinity diagram",
+      "Topic Brainstorm",
+      "Where in the world",
+      "Daily stand-up",
+      "Moodboard",
+      "Cause and effect diagram",
+      "Jobs to be done",
+      "Quick retrospective",
+      "Cost/benefit analysis"
+    ],
+    "Brainstorming": [
+      "Affinity diagram",
+      "Brainstorm",
+      "Brainwriting",
+      "Moodboard",
+      "Topic Brainstorm"
+    ],
+    "Problem solving": [
+      "Assumption grid",
+      "Cause and effect diagram",
+      "Cost/benefit analysis",
+      "Customer problem statement",
+      "Five why's gap analysis",
+      "Gap analysis",
+      "Importance/feasibility analysis",
+      "Rose, thorn, bud"
+    ],
+    "Design and research": [
+      "Affinity diagram",
+      "Empathy map",
+      "Feedback grid",
+      "Kano model",
+      "Moodboard",
+      "Simple journey map",
+      "Storyboarding",
+      "User Interviews"
+    ],
+    "Strategy": [
+      "Assumption grid",
+      "Cost/benefit analysis",
+      "Feature goals",
+      "Goal setting",
+      "Importance/feasibility analysis",
+      "Pros and cons",
+      "SMART",
+      "SWOT analysis",
+      "Simple journey map",
+      "Success Metrics"
+    ],
+    "Project planning": [
+      "Daily stand-up",
+      "Feature goals",
+      "Goal setting",
+      "Jobs to be done",
+      "Kanban",
+      "Product backlog funnel",
+      "Program increment (PI) planning",
+      "Project kickoff",
+      "Success Metrics",
+      "Team alignment",
+      "Team planning",
+      "User Story Mapping"
+    ],
+    "Retrospective": [
+      "4L's retrospective",
+      "House retrospective",
+      "Mad, sad, glad",
+      "Quick retrospective",
+      "Rose, thorn, bud",
+      "Sailboat retrospective",
+      "Start, stop, continue",
+      "Team retrospective"
+    ],
+    "Games": [
+      "Choose your favorite",
+      "Two truths, one lie",
+      "Where in the world"
+    ],
+    "Workshops": [
+      "Brainstorm workshop",
+      "Team alignment workshop"
+    ],
+    "Learning": [
+      "5 Ws and an H",
+      "Brainstorm",
+      "Compare and contrast",
+      "Exit ticket",
+      "Four corners",
+      "Glows and Grows",
+      "KWL",
+      "Kanban",
+      "Lesson plan",
+      "Lesson reflection",
+      "Narrative planning",
+      "Persuasive planning",
+      "Pros and cons",
+      "Question of the day",
+      "SMART",
+      "Sort nouns, verbs and adjectives",
+      "Start, stop, continue",
+      "This or that",
+      "Vocabulary word map"
+    ]
+  }
+}
