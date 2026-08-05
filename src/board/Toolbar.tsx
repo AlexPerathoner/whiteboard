@@ -40,12 +40,14 @@ interface Props {
   pens: Pen[]
   penIndex: number
   penFlyout: PenFlyout
+  rulerOn: boolean
   recent: string[]
   canUndo: boolean
   canRedo: boolean
   onTool: (t: Tool) => void
   onPickPen: (i: number) => void
   onChangePen: (next: Pen) => void
+  onToggleRuler: () => void
   onCloseTray: () => void
   onClosePopup: () => void
   onUndo: () => void
@@ -90,6 +92,14 @@ export function Toolbar(props: Props) {
               <span className="nib" style={{ background: p.color }} />
             </button>
           ))}
+          {/* MS puts the ruler in the pen tray, after the pens. */}
+          <button
+            className={`tray-icon ${props.rulerOn ? 'on' : ''}`}
+            onClick={props.onToggleRuler}
+            title="Ruler — ink snaps to its edge (or hold Shift while drawing)"
+          >
+            📐
+          </button>
           <button className="tray-icon" disabled title="Lasso select — not implemented">
             ⌖
           </button>

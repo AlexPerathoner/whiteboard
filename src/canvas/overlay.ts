@@ -1,3 +1,4 @@
+import { drawRuler, type RulerState } from './ruler'
 import {
   applyViewport,
   IDENTITY_VIEWPORT,
@@ -44,6 +45,7 @@ export class OverlayLayer {
     marquee: Rect | null,
     eraser: [number, number] | null = null,
     eraserRadius = 12,
+    ruler: RulerState | null = null,
   ) {
     const ctx = this.ctx
     this.clear()
@@ -81,6 +83,8 @@ export class OverlayLayer {
       ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.round(w), Math.round(h))
       ctx.restore()
     }
+
+    if (ruler) drawRuler(ctx, ruler)
 
     if (eraser) {
       // Drawn rather than set as a CSS cursor so it scales with the tool and

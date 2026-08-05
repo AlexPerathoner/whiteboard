@@ -2,6 +2,16 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { History } from '../canvas/history'
 import { InkEngine } from '../canvas/inkEngine'
 import { OverlayLayer, type Rect } from '../canvas/overlay'
+import {
+  clampRuler,
+  defaultRuler,
+  grabAt,
+  sideFor,
+  snapToRuler,
+  type RulerGrab,
+  type RulerSide,
+  type RulerState,
+} from '../canvas/ruler'
 import { CommittedLayer } from '../canvas/renderer'
 import { DEFAULT_TUNING, type InkStyle, type Stroke, type TextItem } from '../canvas/types'
 import {
@@ -42,6 +52,7 @@ type Drag =
   | { kind: 'pan'; lastX: number; lastY: number }
   | { kind: 'marquee'; start: [number, number]; rect: Rect }
   | { kind: 'erase'; removed: { stroke: Stroke; index: number }[] }
+  | { kind: 'ruler'; grab: Exclude<RulerGrab, null>; last: [number, number] }
   | {
       kind: 'move'
       startWorld: [number, number]
@@ -94,6 +105,12 @@ export function Board({ boardId }: { boardId: string }) {
   // One enum, not two booleans: the popup renders inside the tray, so
   // `popup && !tray` is unrepresentable on screen and must not be in state.
   const [penFlyout, setPenFlyout] = useState<PenFlyout>('none')
+  // Ruler lives in screen space and is deliberately not part of the document:
+  // it is a tool you position, not content you save.
+  const ruler = useRef<RulerState | null>(null)
+  const [rulerOn, setRulerOn] = useState(false)
+  /** Edge chosen at stroke start; see snapToRuler on why it must not float. */
+  const rulerSide = useRef<RulerSide>(1)
   const [recent, setRecent] = useState<string[]>(RECENT_SLOTS.map((p) => p.color))
   const [zoomLabel, setZoomLabel] = useState(100)
   const [texts, setTexts] = useState<TextItem[]>([])
@@ -194,7 +211,14 @@ export function Board({ boardId }: { boardId: string }) {
 
   const drawOverlay = useCallback(
     (marquee: Rect | null = null, eraser: [number, number] | null = null) => {
-      overlay.current?.draw(vp.current, selectionBounds(), marquee, eraser, ERASER_RADIUS_PX)
+      overlay.current?.draw(
+        vp.current,
+        selectionBounds(),
+        marquee,
+        eraser,
+        ERASER_RADIUS_PX,
+        ruler.current,
+      )
     },
     [selectionBounds],
   )
@@ -213,6 +237,17 @@ export function Board({ boardId }: { boardId: string }) {
       setToolState('pen')
       setPenFlyout('tray')
     }
+  }
+
+  const toggleRuler = () => {
+    const stage = stageRef.current!
+    ruler.current = ruler.current
+      ? null
+      : defaultRuler(stage.clientWidth, stage.clientHeight)
+    setRulerOn(!!ruler.current)
+    setPenFlyout('none')
+    setToolState('pen')
+    drawOverlay()
   }
 
   /** MS: clicking the already-selected slot opens its settings. */
@@ -380,6 +415,7 @@ export function Board({ boardId }: { boardId: string }) {
       layer.current!.resize(w, h, dpr)
       engine.current!.resize(w, h, dpr)
       overlay.current!.resize(w, h, dpr)
+      if (ruler.current) ruler.current = clampRuler(ruler.current, w, h)
       drawOverlay()
     }
     resize()
@@ -556,6 +592,15 @@ export function Board({ boardId }: { boardId: string }) {
     const textHit = pendingTextHit.current
     pendingTextHit.current = null
 
+    if (ruler.current) {
+      const grab = grabAt(ruler.current, e.clientX - ox, e.clientY - oy)
+      if (grab) {
+        capturePointer(stage, e.pointerId)
+        drag.current = { kind: 'ruler', grab, last: [e.clientX - ox, e.clientY - oy] }
+        return
+      }
+    }
+
     if (tool === 'eraser') {
       capturePointer(stage, e.pointerId)
       const d = { kind: 'erase' as const, removed: [] }
@@ -624,14 +669,30 @@ export function Board({ boardId }: { boardId: string }) {
     if (tool !== 'pen') return
     capturePointer(stage, e.pointerId)
     drag.current = { kind: 'ink' }
-    engine.current!.begin(wx, wy, e.timeStamp, penStyle(pens[penIndex]))
+    if (ruler.current) rulerSide.current = sideFor(ruler.current, e.clientX - ox, e.clientY - oy)
+    const [ix, iy] = inkPoint(e.clientX - ox, e.clientY - oy)
+    engine.current!.begin(ix, iy, e.timeStamp, penStyle(pens[penIndex]))
   }
 
-  const extend = useCallback((clientX: number, clientY: number, time: number, src: string) => {
-    const [ox, oy] = origin.current
-    const [wx, wy] = screenToWorld(vp.current, clientX - ox, clientY - oy)
-    engine.current!.extend(wx, wy, time, src)
+  /**
+   * Screen point -> world, snapped to the ruler's edge when one is out and the
+   * pointer is close enough to it.
+   */
+  const inkPoint = useCallback((sx: number, sy: number): [number, number] => {
+    const snapped = ruler.current
+      ? snapToRuler(ruler.current, sx, sy, rulerSide.current)
+      : null
+    return screenToWorld(vp.current, snapped ? snapped[0] : sx, snapped ? snapped[1] : sy)
   }, [])
+
+  const extend = useCallback(
+    (clientX: number, clientY: number, time: number, src: string) => {
+      const [ox, oy] = origin.current
+      const [wx, wy] = inkPoint(clientX - ox, clientY - oy)
+      engine.current!.extend(wx, wy, time, src)
+    },
+    [inkPoint],
+  )
 
   useEffect(() => {
     const stage = stageRef.current!
@@ -660,6 +721,22 @@ export function Board({ boardId }: { boardId: string }) {
       syncViewport()
       return
     }
+    if (d.kind === 'ruler') {
+      const [ox, oy] = origin.current
+      const sx = e.clientX - ox
+      const sy = e.clientY - oy
+      const r = ruler.current!
+      if (d.grab === 'move') {
+        ruler.current = { ...r, cx: r.cx + (sx - d.last[0]), cy: r.cy + (sy - d.last[1]) }
+      } else {
+        // Rotate about the centre, following the pointer's bearing.
+        ruler.current = { ...r, angle: Math.atan2(sy - r.cy, sx - r.cx) }
+      }
+      d.last = [sx, sy]
+      drawOverlay()
+      return
+    }
+
     if (d.kind === 'erase') {
       const [ox, oy] = origin.current
       const sx = e.clientX - ox
@@ -853,12 +930,14 @@ export function Board({ boardId }: { boardId: string }) {
         pens={pens}
         penIndex={penIndex}
         penFlyout={penFlyout}
+        rulerOn={rulerOn}
         recent={recent}
         canUndo={historyState.canUndo}
         canRedo={historyState.canRedo}
         onTool={(t) => (t === 'pen' ? onPenTool() : setTool(t))}
         onPickPen={onPickPen}
         onChangePen={onChangePen}
+        onToggleRuler={toggleRuler}
         onCloseTray={() => setPenFlyout('none')}
         onClosePopup={() => setPenFlyout('tray')}
         onUndo={() => {
