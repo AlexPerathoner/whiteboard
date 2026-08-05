@@ -58,6 +58,16 @@ const supportsRaw = 'onpointerrawupdate' in window
  */
 const MOVE_THRESHOLD_PX = 3
 
+/** Capture is an optimisation for drags, not a requirement; it throws if the
+ *  pointer has already been released. */
+function capturePointer(el: HTMLElement, pointerId: number) {
+  try {
+    el.setPointerCapture(pointerId)
+  } catch {
+    /* ignore */
+  }
+}
+
 export function Board({ boardId }: { boardId: string }) {
   const stageRef = useRef<HTMLDivElement>(null)
   const committedRef = useRef<HTMLCanvasElement>(null)
@@ -387,9 +397,11 @@ export function Board({ boardId }: { boardId: string }) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat) spaceHeld.current = true
       const el = e.target as HTMLElement | null
+      // Checked before the space handling: a space typed into a text box is a
+      // space, not the pan modifier.
       if (el && (el.tagName === 'INPUT' || el.isContentEditable)) return
+      if (e.code === 'Space' && !e.repeat) spaceHeld.current = true
 
       if (e.metaKey || e.ctrlKey) {
         const k = e.key.toLowerCase()
@@ -437,11 +449,20 @@ export function Board({ boardId }: { boardId: string }) {
     const up = (e: KeyboardEvent) => {
       if (e.code === 'Space') spaceHeld.current = false
     }
+    // Losing the window mid-press means the keyup never arrives, which would
+    // leave every later click behaving as a pan.
+    const release = () => {
+      spaceHeld.current = false
+    }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
+    window.addEventListener('blur', release)
+    document.addEventListener('visibilitychange', release)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', release)
+      document.removeEventListener('visibilitychange', release)
     }
   }, [deleteSelection, drawOverlay])
 
@@ -493,18 +514,13 @@ export function Board({ boardId }: { boardId: string }) {
     const stage = stageRef.current!
     const [ox, oy] = origin.current
     activePointer.current = e.pointerId
-    // Throws if the pointer is already gone (fast release, synthetic events).
-    try {
-      stage.setPointerCapture(e.pointerId)
-    } catch {
-      /* capture is an optimisation, not a requirement */
-    }
 
     // Middle button, right button, held space and the hand tool all pan --
     // matching MS, where every one of those is a valid way to move the canvas.
     const wantsPan = e.button === 1 || e.button === 2 || spaceHeld.current || tool === 'hand'
     if (wantsPan) {
       drag.current = { kind: 'pan', lastX: e.clientX, lastY: e.clientY }
+      capturePointer(stage, e.pointerId)
       return
     }
     // A press on the canvas dismisses the pen flyouts, as in MS.
@@ -519,6 +535,11 @@ export function Board({ boardId }: { boardId: string }) {
     pendingTextHit.current = null
 
     if (tool === 'text') {
+      // Placing text is a click, not a drag: taking pointer capture here would
+      // retarget the follow-up mouse events to the stage, and the default
+      // mousedown action then moves focus away from the box we are about to
+      // create. Suppress it instead.
+      e.preventDefault()
       // Clicking existing text with the text tool edits it rather than
       // stacking a fresh box on top of it.
       const existingId = textHit
@@ -552,6 +573,7 @@ export function Board({ boardId }: { boardId: string }) {
       if (hit) {
         if (e.shiftKey) selection.current.add(hit.id)
         else if (!selection.current.has(hit.id)) selection.current = new Set([hit.id])
+        capturePointer(stage, e.pointerId)
         drag.current = {
           kind: 'move',
           startWorld: [wx, wy],
@@ -560,6 +582,7 @@ export function Board({ boardId }: { boardId: string }) {
         }
       } else {
         if (!e.shiftKey) selection.current = new Set()
+        capturePointer(stage, e.pointerId)
         drag.current = { kind: 'marquee', start: [wx, wy], rect: [wx, wy, wx, wy] }
       }
       bumpSelection()
@@ -568,6 +591,7 @@ export function Board({ boardId }: { boardId: string }) {
     }
 
     if (tool !== 'pen') return
+    capturePointer(stage, e.pointerId)
     drag.current = { kind: 'ink' }
     engine.current!.begin(wx, wy, e.timeStamp, penStyle(pens[penIndex]))
   }

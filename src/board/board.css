@@ -47,10 +47,16 @@
   cursor: text;
   user-select: text;
 }
-/* Give an empty box something to click while it is being typed into. */
+/* An empty box is otherwise a near-invisible sliver: give it a placeholder so
+   it is obvious the click landed and the caret is waiting. */
 .text-item.editing:empty::before {
-  content: " ";
+  content: "Type here";
+  color: #a19f9d;
   white-space: pre;
+}
+.text-item.editing {
+  min-width: 2ch;
+  padding: 0 2px;
 }
 .stage.tool-hand { cursor: grab; }
 .stage.tool-hand:active { cursor: grabbing; }
