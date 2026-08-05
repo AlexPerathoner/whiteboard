@@ -13,7 +13,13 @@ import {
   type RulerState,
 } from '../canvas/ruler'
 import { CommittedLayer } from '../canvas/renderer'
-import { DEFAULT_TUNING, type InkStyle, type Stroke, type TextItem } from '../canvas/types'
+import {
+  DEFAULT_TUNING,
+  type DomItem,
+  type InkStyle,
+  type Stroke,
+  type TextItem,
+} from '../canvas/types'
 import {
   boundsIntersect,
   clampZoom,
@@ -28,7 +34,7 @@ import { api, EMPTY_DOC, type BoardDoc } from '../api'
 import { navigate } from '../router'
 import { instantiate, TEMPLATE_WIDTH, type Template } from '../templates/templates'
 import { TemplatePicker } from './TemplatePicker'
-import { TextLayer } from './TextLayer'
+import { ItemLayer } from './ItemLayer'
 import { renderThumbnail } from './thumbnail'
 import { Toolbar, type PenFlyout, type Tool } from './Toolbar'
 import './board.css'
@@ -40,10 +46,24 @@ const AUTOSAVE_MS = 1500
 const DEFAULT_FONT_SIZE = 24
 /** Default wrap width in world units. */
 const DEFAULT_TEXT_WIDTH = 480
+/** Notes are square in MS; this is one side, in world units. */
+const NOTE_SIZE = 200
+const REACTION_SIZE = 64
+/** MS's note colours. */
+const NOTE_COLORS = ['#FEF7A8', '#FBD3A5', '#F9B8C0', '#C8E6C9', '#B8DCF5', '#D9C7F0', '#E8E8E8']
+const REACTIONS = ['👍', '❤️', '😀', '🎉', '😮', '😢', '🔥', '⭐']
 /** Pens whose colours seed the "recent" row in the settings popup. */
 const RECENT_SLOTS = DEFAULT_PENS.slice(0, 3)
 
-const TOOL_KEYS: Record<string, Tool> = { v: 'select', h: 'hand', p: 'pen', e: 'eraser', t: 'text' }
+const TOOL_KEYS: Record<string, Tool> = {
+  v: 'select',
+  h: 'hand',
+  p: 'pen',
+  e: 'eraser',
+  t: 'text',
+  n: 'note',
+  r: 'reaction',
+}
 
 function penStyle(pen: Pen): InkStyle {
   return { color: pen.color, size: penSize(pen), opacity: pen.opacity, tool: pen.tool }
@@ -115,9 +135,11 @@ export function Board({ boardId }: { boardId: string }) {
   const rulerSide = useRef<RulerSide>(1)
   const [recent, setRecent] = useState<string[]>(RECENT_SLOTS.map((p) => p.color))
   const [zoomLabel, setZoomLabel] = useState(100)
-  const [texts, setTexts] = useState<TextItem[]>([])
+  const [items, setItems] = useState<DomItem[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [noteColor, setNoteColor] = useState(NOTE_COLORS[0])
+  const [reaction, setReaction] = useState(REACTIONS[0])
   // Selection is a ref so the pointer handlers can mutate it and redraw the
   // overlay synchronously; this forces the render that lets the text layer
   // show its selected state.
@@ -125,8 +147,8 @@ export function Board({ boardId }: { boardId: string }) {
   // Text lives in the DOM and is positioned from the viewport, so it needs a
   // render when the camera moves. Skipped entirely when there is no text.
   const [, setVpTick] = useState(0)
-  const textsRef = useRef<TextItem[]>(texts)
-  textsRef.current = texts
+  const itemsRef = useRef<DomItem[]>(items)
+  itemsRef.current = items
   /** Set by the text layer when a text element takes the pointerdown. */
   const pendingTextHit = useRef<string | null>(null)
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false })
@@ -141,7 +163,7 @@ export function Board({ boardId }: { boardId: string }) {
     const doc: BoardDoc = {
       version: 1,
       strokes: layer.current!.strokes,
-      texts: textsRef.current,
+      items: itemsRef.current,
       zones: layer.current!.zones,
     }
     try {
@@ -186,10 +208,14 @@ export function Board({ boardId }: { boardId: string }) {
    * changes when the text itself does, which `textSizes.current.delete` covers.
    */
   const textSizes = useRef(new Map<string, [number, number]>())
-  const textBounds = useCallback((item: TextItem): Rect => {
+  const itemBounds = useCallback((item: DomItem): Rect => {
+    // Notes and reactions carry their own size; only text has to be measured.
+    if (item.type !== 'text') {
+      return [item.x, item.y, item.x + item.size, item.y + item.size]
+    }
     let size = textSizes.current.get(item.id)
     if (!size) {
-      const el = stageRef.current?.querySelector<HTMLElement>(`.text-item[data-id="${item.id}"]`)
+      const el = stageRef.current?.querySelector<HTMLElement>(`.board-item[data-id="${item.id}"]`)
       if (!el) {
         // Before first paint: rough estimate, deliberately not cached.
         const w = Math.max(1, item.text.length) * item.fontSize * 0.55
@@ -209,9 +235,9 @@ export function Board({ boardId }: { boardId: string }) {
     if (!l || selection.current.size === 0) return null
     return unionRects([
       ...l.strokes.filter((s) => selection.current.has(s.id)).map((s) => s.bounds),
-      ...textsRef.current.filter((t) => selection.current.has(t.id)).map(textBounds),
+      ...itemsRef.current.filter((t) => selection.current.has(t.id)).map(itemBounds),
     ])
-  }, [textBounds])
+  }, [itemBounds])
 
   const drawOverlay = useCallback(
     (marquee: Rect | null = null, eraser: [number, number] | null = null) => {
@@ -279,8 +305,8 @@ export function Board({ boardId }: { boardId: string }) {
   /** Moves everything in the selection -- strokes on the canvas, text in the DOM. */
   const translateSelection = useCallback((ids: Set<string>, dx: number, dy: number) => {
     layer.current!.translate(ids, dx, dy)
-    if (textsRef.current.some((t) => ids.has(t.id))) {
-      setTexts((list) =>
+    if (itemsRef.current.some((t) => ids.has(t.id))) {
+      setItems((list) =>
         list.map((t) => (ids.has(t.id) ? { ...t, x: t.x + dx, y: t.y + dy } : t)),
       )
     }
@@ -307,7 +333,7 @@ export function Board({ boardId }: { boardId: string }) {
     const entries = l.strokes
       .map((stroke, index) => ({ stroke, index }))
       .filter((e) => ids.has(e.stroke.id))
-    const textEntries = textsRef.current
+    const textEntries = itemsRef.current
       .map((item, index) => ({ item, index }))
       .filter((e) => ids.has(e.item.id))
     if (entries.length === 0 && textEntries.length === 0) return
@@ -315,12 +341,12 @@ export function Board({ boardId }: { boardId: string }) {
       label: 'delete',
       do: () => {
         l.remove(ids)
-        if (textEntries.length) setTexts((list) => list.filter((t) => !ids.has(t.id)))
+        if (textEntries.length) setItems((list) => list.filter((t) => !ids.has(t.id)))
       },
       undo: () => {
         l.insertAt(entries)
         if (textEntries.length)
-          setTexts((list) => {
+          setItems((list) => {
             const next = [...list]
             for (const { item, index } of textEntries) {
               next.splice(Math.min(index, next.length), 0, item)
@@ -352,12 +378,12 @@ export function Board({ boardId }: { boardId: string }) {
         label: `template ${t.name}`,
         do: () => {
           l.setZones([...l.zones, ...zones])
-          setTexts((list) => [...list, ...texts])
+          setItems((list) => [...list, ...texts])
         },
         undo: () => {
           l.setZones(l.zones.filter((z) => !ids.has(z.id)))
           const textIds = new Set(texts.map((x) => x.id))
-          setTexts((list) => list.filter((x) => !textIds.has(x.id)))
+          setItems((list) => list.filter((x) => !textIds.has(x.id)))
         },
       })
     },
@@ -369,22 +395,24 @@ export function Board({ boardId }: { boardId: string }) {
     (id: string, text: string) => {
       setEditingId(null)
       textSizes.current.delete(id)
-      const existing = textsRef.current.find((t) => t.id === id)
-      if (!existing) return
+      const existing = itemsRef.current.find((t) => t.id === id)
+      // Reactions carry no text, so nothing to commit.
+      if (!existing || existing.type === 'reaction') return
       const trimmed = text.trim()
 
-      // A box that was never given any text is not worth an undo entry.
-      if (existing.text === '' && trimmed === '') {
-        setTexts((list) => list.filter((t) => t.id !== id))
+      // An empty *text* box that was never typed into is not worth an undo
+      // entry. A note is a real object even when blank, so it stays.
+      if (existing.type === 'text' && existing.text === '' && trimmed === '') {
+        setItems((list) => list.filter((t) => t.id !== id))
         return
       }
       if (existing.text === trimmed) return
 
       const before = existing.text
       const apply = (value: string) =>
-        setTexts((list) => list.map((t) => (t.id === id ? { ...t, text: value } : t)))
+        setItems((list) => list.map((t) => (t.id === id ? { ...t, text: value } : t)))
 
-      if (before === '') {
+      if (existing.type === 'text' && before === '') {
         // First commit of a new box: undo removes it entirely.
         const created = { ...existing, text: trimmed }
         history.current!.push({
@@ -392,12 +420,12 @@ export function Board({ boardId }: { boardId: string }) {
           // Insert-or-replace: on first run the empty box is still in the list,
           // but after an undo removed it, redo has to put it back.
           do: () =>
-            setTexts((list) =>
+            setItems((list) =>
               list.some((t) => t.id === id)
                 ? list.map((t) => (t.id === id ? created : t))
                 : [...list, created],
             ),
-          undo: () => setTexts((list) => list.filter((t) => t.id !== id)),
+          undo: () => setItems((list) => list.filter((t) => t.id !== id)),
         })
         return
       }
@@ -424,7 +452,7 @@ export function Board({ boardId }: { boardId: string }) {
     l.invalidate()
     drawOverlay()
     setZoomLabel(Math.round(vp.current.z * 100))
-    if (textsRef.current.length) setVpTick((n) => n + 1)
+    if (itemsRef.current.length) setVpTick((n) => n + 1)
   }, [drawOverlay])
 
   // --- setup ---------------------------------------------------------------
@@ -506,7 +534,7 @@ export function Board({ boardId }: { boardId: string }) {
           e.preventDefault()
           selection.current = new Set([
             ...layer.current!.strokes.map((s) => s.id),
-            ...textsRef.current.map((t) => t.id),
+            ...itemsRef.current.map((t) => t.id),
           ])
           bumpSelection()
           // setTool, not setToolState -- this also dismisses the pen flyouts,
@@ -569,7 +597,7 @@ export function Board({ boardId }: { boardId: string }) {
         if (cancelled) return
         layer.current!.setStrokes(doc.strokes ?? [])
         layer.current!.setZones(doc.zones ?? [])
-        setTexts(doc.texts ?? [])
+        setItems(doc.texts ?? [])
         // Loading is not an edit, and the freshly loaded state is not undoable.
         history.current!.clear()
         dirty.current = false
@@ -586,7 +614,7 @@ export function Board({ boardId }: { boardId: string }) {
       const doc: BoardDoc = {
         version: 1,
         strokes: layer.current!.strokes,
-        texts: textsRef.current,
+        items: itemsRef.current,
         zones: layer.current!.zones,
       }
       navigator.sendBeacon(
@@ -646,6 +674,24 @@ export function Board({ boardId }: { boardId: string }) {
       return
     }
 
+    if (tool === 'note' || tool === 'reaction') {
+      e.preventDefault()
+      const base = { id: crypto.randomUUID(), x: wx, y: wy }
+      const item: DomItem =
+        tool === 'note'
+          ? { ...base, type: 'note', size: NOTE_SIZE, color: noteColor, text: '' }
+          : { ...base, type: 'reaction', size: REACTION_SIZE, emoji: reaction }
+      history.current!.push({
+        label: tool,
+        // Insert-or-replace, so redo can put it back after an undo removed it.
+        do: () => setItems((l) => (l.some((i) => i.id === item.id) ? l : [...l, item])),
+        undo: () => setItems((l) => l.filter((i) => i.id !== item.id)),
+      })
+      // A fresh note opens for typing; a reaction is just placed.
+      if (tool === 'note') setEditingId(item.id)
+      return
+    }
+
     if (tool === 'text') {
       // Placing text is a click, not a drag: taking pointer capture here would
       // retarget the follow-up mouse events to the stage, and the default
@@ -671,7 +717,7 @@ export function Board({ boardId }: { boardId: string }) {
         color: pens[penIndex].color,
         text: '',
       }
-      setTexts((list) => [...list, item])
+      setItems((list) => [...list, item])
       setEditingId(item.id)
       return
     }
@@ -838,8 +884,8 @@ export function Board({ boardId }: { boardId: string }) {
       if (!e.shiftKey) selection.current = new Set()
       for (const s of picked) selection.current.add(s.id)
       const norm = normRect(d.rect)
-      for (const t of textsRef.current) {
-        if (boundsIntersect(textBounds(t), norm)) selection.current.add(t.id)
+      for (const t of itemsRef.current) {
+        if (boundsIntersect(itemBounds(t), norm)) selection.current.add(t.id)
       }
       bumpSelection()
       drawOverlay()
@@ -910,7 +956,7 @@ export function Board({ boardId }: { boardId: string }) {
     const stage = stageRef.current!
     const content = unionRects([
       ...l.strokes.map((s) => s.bounds),
-      ...textsRef.current.map(textBounds),
+      ...itemsRef.current.map(itemBounds),
     ])
     if (!content) return
     const [x0, y0, x1, y1] = content
@@ -940,8 +986,8 @@ export function Board({ boardId }: { boardId: string }) {
         <canvas ref={committedRef} />
         <canvas ref={wetRef} />
         <canvas ref={overlayRef} />
-        <TextLayer
-          items={texts}
+        <ItemLayer
+          items={items}
           vp={vp.current}
           editingId={editingId}
           selected={selection.current}
@@ -975,6 +1021,18 @@ export function Board({ boardId }: { boardId: string }) {
         onChangePen={onChangePen}
         onToggleRuler={toggleRuler}
         onOpenTemplates={() => setPickerOpen(true)}
+        noteColors={NOTE_COLORS}
+        noteColor={noteColor}
+        onNoteColor={(c) => {
+          setNoteColor(c)
+          setTool('note')
+        }}
+        reactions={REACTIONS}
+        reaction={reaction}
+        onReaction={(r) => {
+          setReaction(r)
+          setTool('reaction')
+        }}
         onCloseTray={() => setPenFlyout('none')}
         onClosePopup={() => setPenFlyout('tray')}
         onUndo={() => {

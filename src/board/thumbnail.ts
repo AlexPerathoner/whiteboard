@@ -1,5 +1,5 @@
 import { paintStroke } from '../canvas/inkEngine'
-import { DEFAULT_TUNING, type Stroke, type TextItem, type ZoneItem } from '../canvas/types'
+import { DEFAULT_TUNING, type DomItem, type Stroke, type ZoneItem } from '../canvas/types'
 import { unionRects, type Rect } from '../canvas/viewport'
 
 const W = 480
@@ -14,7 +14,7 @@ const H = 270
  */
 export async function renderThumbnail(
   strokes: Stroke[],
-  texts: TextItem[],
+  items: DomItem[] = [],
   zones: ZoneItem[] = [],
 ): Promise<Blob | null> {
   const canvas = document.createElement('canvas')
@@ -29,8 +29,10 @@ export async function renderThumbnail(
   const rects: Rect[] = [
     ...zones.map((z): Rect => [z.x, z.y, z.x + z.w, z.y + z.h]),
     ...strokes.map((s) => s.bounds),
-    ...texts.map(
-      (t): Rect => [t.x, t.y, t.x + t.w, t.y + t.fontSize * 1.4],
+    ...items.map((i): Rect =>
+      i.type === 'text'
+        ? [i.x, i.y, i.x + i.w, i.y + i.fontSize * 1.4]
+        : [i.x, i.y, i.x + i.size, i.y + i.size],
     ),
   ]
   const content = unionRects(rects)
@@ -49,12 +51,21 @@ export async function renderThumbnail(
       ctx.strokeRect(z.x, z.y, z.w, z.h)
     }
     for (const s of strokes) paintStroke(ctx, s, DEFAULT_TUNING)
-    for (const t of texts) {
+    for (const i of items) {
       ctx.save()
-      ctx.fillStyle = t.color
-      ctx.font = `${t.fontSize}px "Segoe UI", system-ui, sans-serif`
-      ctx.textBaseline = 'top'
-      ctx.fillText(t.text, t.x, t.y, t.w)
+      if (i.type === 'note') {
+        ctx.fillStyle = i.color
+        ctx.fillRect(i.x, i.y, i.size, i.size)
+      } else if (i.type === 'reaction') {
+        ctx.font = `${i.size * 0.8}px "Segoe UI Emoji", system-ui, sans-serif`
+        ctx.textBaseline = 'top'
+        ctx.fillText(i.emoji, i.x, i.y)
+      } else {
+        ctx.fillStyle = i.color
+        ctx.font = `${i.fontSize}px "Segoe UI", system-ui, sans-serif`
+        ctx.textBaseline = 'top'
+        ctx.fillText(i.text, i.x, i.y, i.w)
+      }
       ctx.restore()
     }
   }

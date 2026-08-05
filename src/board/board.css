@@ -313,3 +313,99 @@ button:disabled { opacity: 0.35; cursor: default; }
 .board .save-error { color: #c10051; font-weight: 600; }
 
 .stage.tool-eraser { cursor: none; }
+
+/* --- DOM items: text, notes, reactions ---------------------------------- */
+
+.item-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.board-item {
+  position: absolute;
+  /* Padding must not grow the box: itemBounds assumes the item's declared
+     size is its rendered size. */
+  box-sizing: border-box;
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  pointer-events: auto;
+  outline: none;
+}
+.board-item.selected { box-shadow: 0 0 0 1px #5B318D; }
+.board-item.editing { box-shadow: 0 0 0 1px #5B318D; cursor: text; user-select: text; }
+
+.item-text {
+  min-width: 8px;
+  padding: 0 2px;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.item-text.editing { min-width: 2ch; }
+.item-text.editing:empty::before { content: "Type here"; color: #a19f9d; white-space: pre; }
+
+/* MS notes are square cards with a soft shadow and centred text. */
+.item-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Percentage padding resolves against the containing block -- the whole
+     item layer -- not the note, so it must be font-relative. fontSize already
+     scales with zoom, so this stays proportional. */
+  padding: 0.7em;
+  border-radius: 2px;
+  box-shadow: 0 2px 5px rgb(0 0 0 / 18%);
+  color: #1f1f1f;
+  text-align: center;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  cursor: default;
+}
+.item-note.editing:empty::before { content: "Type here"; color: #7a7160; }
+
+.item-reaction {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  user-select: none;
+  cursor: default;
+}
+
+/* Small hover chooser above the note / reaction buttons. */
+.mini-flyout { position: relative; display: inline-flex; }
+.mini-flyout .mini-menu {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
+}
+.mini-flyout:hover .mini-menu { display: flex; }
+.mini-menu .swatch {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  border: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.mini-menu .emoji {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 17px;
+  cursor: pointer;
+}
+.mini-menu .emoji:hover { background: #f0f0f0; }
+.stage.tool-note, .stage.tool-reaction { cursor: copy; }

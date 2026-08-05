@@ -1,4 +1,4 @@
-import type { Stroke, TextItem, ZoneItem } from './canvas/types'
+import type { DomItem, Stroke, TextItem, ZoneItem } from './canvas/types'
 
 export interface BoardMeta {
   id: string
@@ -18,12 +18,14 @@ export interface Folder {
 export interface BoardDoc {
   version: 1
   strokes: Stroke[]
-  texts: TextItem[]
+  items?: DomItem[]
+  /** Pre-notes field name, still read so older boards load. */
+  texts?: TextItem[]
   /** Template backdrops. Absent on documents saved before templates existed. */
   zones?: ZoneItem[]
 }
 
-export const EMPTY_DOC: BoardDoc = { version: 1, strokes: [], texts: [], zones: [] }
+export const EMPTY_DOC: BoardDoc = { version: 1, strokes: [], items: [], zones: [] }
 
 async function json<T>(input: string, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {

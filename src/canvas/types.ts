@@ -70,6 +70,35 @@ export interface TextItem {
   text: string
 }
 
+/** A sticky note: coloured card with text, as MS's "Add note". */
+export interface NoteItem {
+  id: string
+  type: 'note'
+  x: number
+  y: number
+  /** Notes are square in MS; one side length in world units. */
+  size: number
+  color: string
+  text: string
+}
+
+/** An emoji stamp. Not editable -- placed, moved, deleted. */
+export interface ReactionItem {
+  id: string
+  type: 'reaction'
+  x: number
+  y: number
+  size: number
+  emoji: string
+}
+
+/**
+ * Items that live in the DOM rather than on the canvas. They share placement,
+ * selection, movement, deletion and persistence, so the layer renders the
+ * union rather than branching per type at every call site.
+ */
+export type DomItem = TextItem | NoteItem | ReactionItem
+
 /**
  * A backdrop rectangle: the grids, lanes and header bands a template is made
  * of. Painted under the ink and not interactive on its own.

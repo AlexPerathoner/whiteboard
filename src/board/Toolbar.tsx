@@ -1,33 +1,11 @@
 import { penSize, type Pen } from '../theme/palette'
 import { PenSettingsPopup } from './PenSettingsPopup'
 
-export type Tool = 'select' | 'hand' | 'pen' | 'eraser' | 'text'
+export type Tool = 'select' | 'hand' | 'pen' | 'eraser' | 'text' | 'note' | 'reaction'
 
 /** Pen flyout state. The settings popup renders inside the tray, so this is
  *  a ladder, not two independent booleans. */
 export type PenFlyout = 'none' | 'tray' | 'settings'
-
-/**
- * Toolbar slots for features that are not built yet, in MS's order around the
- * text button. Rendered disabled rather than omitted, so the toolbar keeps the
- * same shape as the real app.
- */
-type Placeholder = [glyph: string, label: string]
-const BEFORE_TEXT: Placeholder[] = [
-  ['\u{1F5D2}\uFE0F', 'Sticky note'],
-  ['\u2764\uFE0F', 'Reactions'],
-]
-function Placeholders({ items }: { items: Placeholder[] }) {
-  return (
-    <>
-      {items.map(([glyph, label]) => (
-        <button key={label} disabled title={`${label} — not implemented`}>
-          {glyph}
-        </button>
-      ))}
-    </>
-  )
-}
 
 interface Props {
   tool: Tool
@@ -43,6 +21,12 @@ interface Props {
   onChangePen: (next: Pen) => void
   onToggleRuler: () => void
   onOpenTemplates: () => void
+  noteColors: string[]
+  noteColor: string
+  onNoteColor: (c: string) => void
+  reactions: string[]
+  reaction: string
+  onReaction: (r: string) => void
   onCloseTray: () => void
   onClosePopup: () => void
   onUndo: () => void
@@ -142,7 +126,45 @@ export function Toolbar(props: Props) {
         >
           🧽
         </button>
-        <Placeholders items={BEFORE_TEXT} />
+        {/* Note and reaction each open a small chooser, as MS does. */}
+        <div className="mini-flyout">
+          <button
+            className={tool === 'note' ? 'on' : ''}
+            onClick={() => props.onTool('note')}
+            title="Note (N)"
+          >
+            🗒️
+            <span className="dot" style={{ background: props.noteColor }} />
+          </button>
+          <div className="mini-menu">
+            {props.noteColors.map((c) => (
+              <button
+                key={c}
+                className="swatch"
+                style={{ background: c }}
+                title={c}
+                onClick={() => props.onNoteColor(c)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mini-flyout">
+          <button
+            className={tool === 'reaction' ? 'on' : ''}
+            onClick={() => props.onTool('reaction')}
+            title="Reaction (R)"
+          >
+            {props.reaction}
+          </button>
+          <div className="mini-menu">
+            {props.reactions.map((r) => (
+              <button key={r} className="emoji" onClick={() => props.onReaction(r)}>
+                {r}
+              </button>
+            ))}
+          </div>
+        </div>
         <button
           className={tool === 'text' ? 'on' : ''}
           onClick={() => props.onTool('text')}
