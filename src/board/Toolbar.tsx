@@ -17,12 +17,6 @@ const BEFORE_TEXT: Placeholder[] = [
   ['\u{1F5D2}\uFE0F', 'Sticky note'],
   ['\u2764\uFE0F', 'Reactions'],
 ]
-const AFTER_TEXT: Placeholder[] = [
-  ['\u2B20', 'Shapes'],
-  ['\u25A4', 'Templates'],
-  ['\u22EF', 'More'],
-]
-
 function Placeholders({ items }: { items: Placeholder[] }) {
   return (
     <>
@@ -48,6 +42,7 @@ interface Props {
   onPickPen: (i: number) => void
   onChangePen: (next: Pen) => void
   onToggleRuler: () => void
+  onOpenTemplates: () => void
   onCloseTray: () => void
   onClosePopup: () => void
   onUndo: () => void
@@ -155,7 +150,15 @@ export function Toolbar(props: Props) {
         >
           T
         </button>
-        <Placeholders items={AFTER_TEXT} />
+        <button disabled title="Shapes — not implemented">
+          ⬠
+        </button>
+        <button onClick={props.onOpenTemplates} title="Templates">
+          ▤
+        </button>
+        <button disabled title="More — not implemented">
+          ⋯
+        </button>
       </div>
     </>
   )

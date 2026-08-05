@@ -70,6 +70,21 @@ export interface TextItem {
   text: string
 }
 
+/**
+ * A backdrop rectangle: the grids, lanes and header bands a template is made
+ * of. Painted under the ink and not interactive on its own.
+ */
+export interface ZoneItem {
+  id: string
+  type: 'zone'
+  x: number
+  y: number
+  w: number
+  h: number
+  fill: string
+  stroke: string
+}
+
 export interface Stroke {
   id: string
   type: 'stroke'

@@ -26,6 +26,8 @@ import {
 import { DEFAULT_PENS, penSize, type Pen } from '../theme/palette'
 import { api, EMPTY_DOC, type BoardDoc } from '../api'
 import { navigate } from '../router'
+import { instantiate, TEMPLATE_WIDTH, type Template } from '../templates/templates'
+import { TemplatePicker } from './TemplatePicker'
 import { TextLayer } from './TextLayer'
 import { renderThumbnail } from './thumbnail'
 import { Toolbar, type PenFlyout, type Tool } from './Toolbar'
@@ -115,6 +117,7 @@ export function Board({ boardId }: { boardId: string }) {
   const [zoomLabel, setZoomLabel] = useState(100)
   const [texts, setTexts] = useState<TextItem[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   // Selection is a ref so the pointer handlers can mutate it and redraw the
   // overlay synchronously; this forces the render that lets the text layer
   // show its selected state.
@@ -139,10 +142,11 @@ export function Board({ boardId }: { boardId: string }) {
       version: 1,
       strokes: layer.current!.strokes,
       texts: textsRef.current,
+      zones: layer.current!.zones,
     }
     try {
       await api.putDoc(boardId, doc)
-      const png = await renderThumbnail(doc.strokes, doc.texts)
+      const png = await renderThumbnail(doc.strokes, doc.texts, doc.zones)
       if (png) await api.putThumb(boardId, png)
       setSaveState('idle')
     } catch (err) {
@@ -329,6 +333,36 @@ export function Board({ boardId }: { boardId: string }) {
     bumpSelection()
     drawOverlay()
   }, [bumpSelection, drawOverlay])
+
+  /**
+   * Drops a template into the middle of the current view as one undoable
+   * command -- backdrop zones plus their labels together.
+   */
+  const insertTemplate = useCallback(
+    (t: Template) => {
+      setPickerOpen(false)
+      const stage = stageRef.current!
+      const l = layer.current!
+      const width = TEMPLATE_WIDTH
+      const height = (t.h / 1000) * width
+      const [cx, cy] = screenToWorld(vp.current, stage.clientWidth / 2, stage.clientHeight / 2)
+      const { zones, texts } = instantiate(t, cx - width / 2, cy - height / 2, width)
+      const ids = new Set(zones.map((z) => z.id))
+      history.current!.push({
+        label: `template ${t.name}`,
+        do: () => {
+          l.setZones([...l.zones, ...zones])
+          setTexts((list) => [...list, ...texts])
+        },
+        undo: () => {
+          l.setZones(l.zones.filter((z) => !ids.has(z.id)))
+          const textIds = new Set(texts.map((x) => x.id))
+          setTexts((list) => list.filter((x) => !textIds.has(x.id)))
+        },
+      })
+    },
+    [],
+  )
 
   /** Blur of a text box: create, update or discard. */
   const commitText = useCallback(
@@ -534,6 +568,7 @@ export function Board({ boardId }: { boardId: string }) {
       .then((doc) => {
         if (cancelled) return
         layer.current!.setStrokes(doc.strokes ?? [])
+        layer.current!.setZones(doc.zones ?? [])
         setTexts(doc.texts ?? [])
         // Loading is not an edit, and the freshly loaded state is not undoable.
         history.current!.clear()
@@ -552,6 +587,7 @@ export function Board({ boardId }: { boardId: string }) {
         version: 1,
         strokes: layer.current!.strokes,
         texts: textsRef.current,
+        zones: layer.current!.zones,
       }
       navigator.sendBeacon(
         `/api/boards/${boardId}/doc`,
@@ -938,6 +974,7 @@ export function Board({ boardId }: { boardId: string }) {
         onPickPen={onPickPen}
         onChangePen={onChangePen}
         onToggleRuler={toggleRuler}
+        onOpenTemplates={() => setPickerOpen(true)}
         onCloseTray={() => setPenFlyout('none')}
         onClosePopup={() => setPenFlyout('tray')}
         onUndo={() => {
@@ -949,6 +986,10 @@ export function Board({ boardId }: { boardId: string }) {
           drawOverlay()
         }}
       />
+
+      {pickerOpen && (
+        <TemplatePicker onPick={insertTemplate} onClose={() => setPickerOpen(false)} />
+      )}
 
       <div className="zoom">
         <button onClick={() => zoomTo(vp.current.z / 1.25)} title="Zoom out">

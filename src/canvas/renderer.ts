@@ -1,5 +1,5 @@
 import { applyStrokeStyle, isConstantWidth, paintStroke, strokePath } from './inkEngine'
-import type { InkTuning, Stroke } from './types'
+import type { InkTuning, Stroke, ZoneItem } from './types'
 import {
   applyViewport,
   boundsIntersect,
@@ -31,6 +31,8 @@ export class CommittedLayer {
   private paths = new Map<string, Path2D>()
 
   strokes: Stroke[] = []
+  /** Template backdrops. Painted first, so ink always sits on top. */
+  zones: ZoneItem[] = []
   vp: Viewport = { x: 0, y: 0, z: 1 }
   tuning: InkTuning
 
@@ -73,6 +75,14 @@ export class CommittedLayer {
     applyViewport(ctx, this.vp, this.dpr)
 
     const view = visibleBounds(this.vp, this.cssW, this.cssH)
+    for (const z of this.zones) {
+      if (!boundsIntersect([z.x, z.y, z.x + z.w, z.y + z.h], view)) continue
+      ctx.fillStyle = z.fill
+      ctx.fillRect(z.x, z.y, z.w, z.h)
+      ctx.strokeStyle = z.stroke
+      ctx.lineWidth = 1 / this.vp.z
+      ctx.strokeRect(z.x, z.y, z.w, z.h)
+    }
     let drawn = 0
     for (const s of this.strokes) {
       if (!boundsIntersect(s.bounds, view)) continue
@@ -104,6 +114,11 @@ export class CommittedLayer {
 
   setStrokes(strokes: Stroke[]) {
     this.strokes = strokes
+    this.invalidate()
+  }
+
+  setZones(zones: ZoneItem[]) {
+    this.zones = zones
     this.invalidate()
   }
 

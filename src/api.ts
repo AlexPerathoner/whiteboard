@@ -1,4 +1,4 @@
-import type { Stroke, TextItem } from './canvas/types'
+import type { Stroke, TextItem, ZoneItem } from './canvas/types'
 
 export interface BoardMeta {
   id: string
@@ -19,9 +19,11 @@ export interface BoardDoc {
   version: 1
   strokes: Stroke[]
   texts: TextItem[]
+  /** Template backdrops. Absent on documents saved before templates existed. */
+  zones?: ZoneItem[]
 }
 
-export const EMPTY_DOC: BoardDoc = { version: 1, strokes: [], texts: [] }
+export const EMPTY_DOC: BoardDoc = { version: 1, strokes: [], texts: [], zones: [] }
 
 async function json<T>(input: string, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {
