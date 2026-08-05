@@ -4,6 +4,7 @@ import {
   applyViewport,
   IDENTITY_VIEWPORT,
   sizeCanvas,
+  unionRects,
   worldToScreen,
   type Rect,
   type Viewport,
@@ -38,6 +39,13 @@ export interface InkStats {
 export const MIN_TAIL_WINDOW = 4
 
 /**
+ * How many spine points accumulate before the settled part of the stroke is
+ * frozen into a reusable path. Rebuilding that prefix is O(n), so doing it
+ * once every FREEZE_EVERY samples keeps the amortised per-sample cost flat.
+ */
+const FREEZE_EVERY = 64
+
+/**
  * Renders the in-progress ("wet") stroke.
  *
  * Everything here runs synchronously inside the pointer event handler, so the
@@ -56,6 +64,11 @@ export class InkEngine {
   private dpr = 1
 
   private spine: InkPoint[] = []
+  /** Outline of the settled prefix, rebuilt every FREEZE_EVERY points. */
+  private frozenPath: Path2D | null = null
+  private frozenCount = 0
+  /** Region touched by the previous sample, so the old tip can be erased. */
+  private lastDirty: Rect | null = null
   /** Last unfiltered pointer position, so the stroke can end exactly there. */
   private lastRaw: [number, number] | null = null
   private style: InkStyle | null = null
@@ -117,6 +130,9 @@ export class InkEngine {
     this.drawing = true
     this.style = style
     this.spine = [[worldX, worldY, 0.5]]
+    this.frozenPath = null
+    this.frozenCount = 0
+    this.lastDirty = null
     this.lastRaw = [worldX, worldY]
     this.pressure = 0.5
     this.lastTime = time
@@ -182,42 +198,85 @@ export class InkEngine {
     if (ms > this.stats.worstSampleMs) this.stats.worstSampleMs = ms
   }
 
+  /**
+   * Redraws the live end of the stroke.
+   *
+   * Filling each new tail polygon on top of the previous one makes every fill
+   * contribute its own antialiased edge, and those edges stack towards full
+   * opacity -- a hard, stepped rim that only vanishes when the committed layer
+   * repaints the stroke as a single fill on pointer-up.
+   *
+   * So this clears the affected region and re-fills the *whole* stroke as one
+   * path: the settled prefix (frozen, rebuilt only every FREEZE_EVERY points)
+   * merged with the live tail. One fill means one antialiasing pass.
+   */
   private drawTail(last: boolean) {
     const style = this.style
     if (!style) return
-    const w = Math.max(MIN_TAIL_WINDOW, this.tuning.window)
-    const tail = this.spine.slice(Math.max(0, this.spine.length - w))
+    const n = this.spine.length
+
+    if (n - this.frozenCount > FREEZE_EVERY) {
+      const count = n - 1
+      this.frozenPath = buildOutlinePath(
+        outlineFor(this.spine.slice(0, count), style.size, this.tuning, false),
+      ).path
+      this.frozenCount = count
+    }
+
+    // One point of overlap: the prefix's end cap and the tail's start cap are
+    // round and concentric, so the union has no notch at the join.
+    const tail = this.spine.slice(this.frozenPath ? Math.max(0, this.frozenCount - 1) : 0)
     const outline = outlineFor(tail, style.size, this.tuning, last)
     if (outline.length === 0) return
 
-    const { path, bounds } = buildOutlinePath(outline)
+    const { path: tailPath, bounds } = buildOutlinePath(outline)
+    const whole = new Path2D()
+    if (this.frozenPath) whole.addPath(this.frozenPath)
+    whole.addPath(tailPath)
+
+    // Repaint the tail's footprint plus wherever the tip was last sample, or
+    // the previous tip is left behind.
+    const dirty = this.lastDirty ? (unionRects([bounds, this.lastDirty]) as Rect) : bounds
+    this.lastDirty = bounds
+
     const target = this.useBuffer ? this.ensureBuffer() : this.ctx
+    const rect = this.deviceRect(dirty, style.size * 0.5 + 2)
+    if (!rect) return
+
+    target.save()
+    // Clip in device space on whole pixels: a fractional clip edge is itself
+    // antialiased and would leave a hairline seam between repaints.
+    target.setTransform(1, 0, 0, 1, 0, 0)
+    target.beginPath()
+    target.rect(rect[0], rect[1], rect[2], rect[3])
+    target.clip()
+    target.clearRect(rect[0], rect[1], rect[2], rect[3])
     this.applyTransform(target)
     target.globalAlpha = 1
     target.globalCompositeOperation = 'source-over'
     target.fillStyle = style.color
-    target.fill(path)
+    target.fill(whole)
+    target.restore()
 
-    if (this.useBuffer) this.blit(bounds, style)
+    if (this.useBuffer) this.blit(dirty, style)
+  }
+
+  /** World rect -> whole-device-pixel rect clipped to the canvas, or null. */
+  private deviceRect(bounds: Rect, pad: number): [number, number, number, number] | null {
+    const [sx0, sy0] = worldToScreen(this.vp, bounds[0] - pad, bounds[1] - pad)
+    const [sx1, sy1] = worldToScreen(this.vp, bounds[2] + pad, bounds[3] + pad)
+    const dx = Math.max(0, Math.floor(sx0 * this.dpr))
+    const dy = Math.max(0, Math.floor(sy0 * this.dpr))
+    const dw = Math.min(this.canvas.width, Math.ceil(sx1 * this.dpr) + 1) - dx
+    const dh = Math.min(this.canvas.height, Math.ceil(sy1 * this.dpr) + 1) - dy
+    return dw > 0 && dh > 0 ? [dx, dy, dw, dh] : null
   }
 
   /** Composites the accumulated buffer onto the wet layer for one dirty rect. */
   private blit(bounds: Rect, style: InkStyle) {
-    const pad = style.size * 0.5 + 2
-    // Build the rect first, then intersect with the canvas -- clamping the
-    // origin without adjusting the size would shift the blit for any stroke
-    // that runs off the top or left edge.
-    const [sx0, sy0] = worldToScreen(this.vp, bounds[0] - pad, bounds[1] - pad)
-    const [sx1, sy1] = worldToScreen(this.vp, bounds[2] + pad, bounds[3] + pad)
-    const x0 = Math.floor(sx0 * this.dpr)
-    const y0 = Math.floor(sy0 * this.dpr)
-    const x1 = Math.ceil(sx1 * this.dpr) + 1
-    const y1 = Math.ceil(sy1 * this.dpr) + 1
-    const dx = Math.max(0, x0)
-    const dy = Math.max(0, y0)
-    const dw = Math.min(this.canvas.width, x1) - dx
-    const dh = Math.min(this.canvas.height, y1) - dy
-    if (dw <= 0 || dh <= 0) return
+    const rect = this.deviceRect(bounds, style.size * 0.5 + 2)
+    if (!rect) return
+    const [dx, dy, dw, dh] = rect
 
     const ctx = this.ctx
     ctx.setTransform(1, 0, 0, 1, 0, 0)
