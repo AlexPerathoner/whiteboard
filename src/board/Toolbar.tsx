@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import type { EraserMode } from '../canvas/erase'
+import { MsIcon, type MS_ICONS } from '../theme/msIcons'
 import { penSize, type Pen } from '../theme/palette'
 import { PenSettingsPopup } from './PenSettingsPopup'
 
@@ -37,10 +39,46 @@ interface Props {
 }
 
 /**
- * Bottom-centre toolbar, laid out like MS Whiteboard: a separate undo pill on
- * the left, then the tool pill. Buttons for features not built yet are shown
- * disabled rather than omitted, so the shape stays 1:1 and the slots are
- * obvious.
+ * A 40x40 hit target wrapping a 32x32 chip. MS paints hover and selection on
+ * that inner chip, not on the button, which is why the structure is nested
+ * rather than a single element.
+ */
+function DockButton({
+  icon,
+  label,
+  on,
+  disabled,
+  onClick,
+  children,
+}: {
+  icon?: keyof typeof MS_ICONS
+  label: string
+  on?: boolean
+  disabled?: boolean
+  onClick?: () => void
+  children?: ReactNode
+}) {
+  return (
+    <button
+      className={`dock-btn ${on ? 'on' : ''}`}
+      title={label}
+      aria-label={label}
+      aria-pressed={on}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="chip">
+        {icon && <MsIcon name={icon} />}
+        {children}
+      </span>
+    </button>
+  )
+}
+
+/**
+ * Bottom dock, rebuilt against the real thing: an undo pill, a 12px gap, then
+ * the tool pill. Geometry, radii, shadow and state colours are measured from
+ * MS rather than guessed -- see src/theme/ms-toolbar.json.
  */
 export function Toolbar(props: Props) {
   const { tool, pens, penIndex, penFlyout, recent } = props
@@ -48,46 +86,59 @@ export function Toolbar(props: Props) {
 
   return (
     <>
-      <div className="undo-pill">
-        <button onClick={props.onUndo} disabled={!props.canUndo} title="Undo (Ctrl+Z)">
-          ↺
-        </button>
+      <div className="dock undo-pill">
+        <DockButton
+          icon="undo"
+          label="Undo (Ctrl+Z)"
+          disabled={!props.canUndo}
+          onClick={props.onUndo}
+        />
         {/* MS only reveals redo once there is something to redo. */}
         {props.canRedo && (
-          <button onClick={props.onRedo} title="Redo (Ctrl+Shift+Z)">
-            ↻
+          <button
+            className="dock-btn redo"
+            title="Redo (Ctrl+Shift+Z)"
+            aria-label="Redo"
+            onClick={props.onRedo}
+          >
+            <span className="chip">
+              <MsIcon name="undo" />
+            </span>
           </button>
         )}
       </div>
 
       {penFlyout !== 'none' && (
-        <div className="pen-tray" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="dock pen-tray" onPointerDown={(e) => e.stopPropagation()}>
           {pens.map((p, i) => (
             <button
               key={i}
-              className={`tray-pen ${p.tool} ${penIndex === i && tool === 'pen' ? 'on' : ''}`}
+              className={`dock-btn tray-pen ${p.tool} ${
+                penIndex === i && tool === 'pen' ? 'on' : ''
+              }`}
               title={`${p.tool === 'highlighter' ? 'Highlighter' : 'Pen'}, thickness ${
                 p.step + 1
               } (${penSize(p)}px), opacity ${p.opacity}`}
               onClick={() => props.onPickPen(i)}
             >
-              <span className="nib" style={{ background: p.color }} />
+              <span className="chip">
+                <span className="nib" style={{ background: p.color }} />
+              </span>
             </button>
           ))}
-          {/* MS puts the ruler in the pen tray, after the pens. */}
-          <button
-            className={`tray-icon ${props.rulerOn ? 'on' : ''}`}
+          <DockButton
+            label="Ruler — ink snaps to its edge (or hold Shift while drawing)"
+            on={props.rulerOn}
             onClick={props.onToggleRuler}
-            title="Ruler — ink snaps to its edge (or hold Shift while drawing)"
           >
-            📐
-          </button>
-          <button className="tray-icon" disabled title="Lasso select — not implemented">
-            ⌖
-          </button>
-          <button className="tray-icon" onClick={props.onCloseTray} title="Close">
-            ✕
-          </button>
+            <span className="glyph">📐</span>
+          </DockButton>
+          <DockButton label="Lasso select — not implemented" disabled>
+            <span className="glyph">⌖</span>
+          </DockButton>
+          <DockButton label="Close" onClick={props.onCloseTray}>
+            <span className="glyph">✕</span>
+          </DockButton>
           {penFlyout === 'settings' && (
             <PenSettingsPopup
               pen={pen}
@@ -99,41 +150,40 @@ export function Toolbar(props: Props) {
         </div>
       )}
 
-      <div className="toolbar" onPointerDown={(e) => e.stopPropagation()}>
-        <button
-          className={tool === 'select' ? 'on' : ''}
+      <div className="dock toolbar" onPointerDown={(e) => e.stopPropagation()}>
+        <DockButton
+          icon="select"
+          label="Select (V)"
+          on={tool === 'select'}
           onClick={() => props.onTool('select')}
-          title="Select (V)"
-        >
-          ➤
-        </button>
-        <button
-          className={tool === 'hand' ? 'on' : ''}
+        />
+        <DockButton
+          icon="pan"
+          label="Pan (H)"
+          on={tool === 'hand'}
           onClick={() => props.onTool('hand')}
-          title="Pan (H)"
-        >
-          ✋
-        </button>
-        <button
-          className={`pen-button ${tool === 'pen' ? 'on' : ''}`}
+        />
+        <DockButton
+          icon="pen"
+          label="Pen (P) — click again for settings"
+          on={tool === 'pen'}
           onClick={() => props.onTool('pen')}
-          title="Pen (P) — click again for settings"
         >
-          ✒️
-          <span className="dot" style={{ background: pen.color }} />
-        </button>
+          <span className="pen-dot" style={{ background: pen.color }} />
+        </DockButton>
+
         <div className="mini-flyout">
-          <button
-            className={tool === 'eraser' ? 'on' : ''}
-            onClick={() => props.onTool('eraser')}
-            title={
+          <DockButton
+            label={
               props.eraserMode === 'stroke'
                 ? 'Eraser (E) — removes a whole stroke on contact'
                 : 'Eraser (E) — rubs out only what it touches'
             }
+            on={tool === 'eraser'}
+            onClick={() => props.onTool('eraser')}
           >
-            🧽
-          </button>
+            <span className="glyph">🧽</span>
+          </DockButton>
           <div className="mini-menu wide">
             <button
               className={props.eraserMode === 'stroke' ? 'on' : ''}
@@ -149,16 +199,14 @@ export function Toolbar(props: Props) {
             </button>
           </div>
         </div>
-        {/* Note and reaction each open a small chooser, as MS does. */}
+
         <div className="mini-flyout">
-          <button
-            className={tool === 'note' ? 'on' : ''}
+          <DockButton
+            icon="note"
+            label="Note (N)"
+            on={tool === 'note'}
             onClick={() => props.onTool('note')}
-            title="Note (N)"
-          >
-            🗒️
-            <span className="dot" style={{ background: props.noteColor }} />
-          </button>
+          />
           <div className="mini-menu">
             {props.noteColors.map((c) => (
               <button
@@ -173,13 +221,12 @@ export function Toolbar(props: Props) {
         </div>
 
         <div className="mini-flyout">
-          <button
-            className={tool === 'reaction' ? 'on' : ''}
+          <DockButton
+            icon="reaction"
+            label="Reaction (R)"
+            on={tool === 'reaction'}
             onClick={() => props.onTool('reaction')}
-            title="Reaction (R)"
-          >
-            {props.reaction}
-          </button>
+          />
           <div className="mini-menu">
             {props.reactions.map((r) => (
               <button key={r} className="emoji" onClick={() => props.onReaction(r)}>
@@ -188,22 +235,16 @@ export function Toolbar(props: Props) {
             ))}
           </div>
         </div>
-        <button
-          className={tool === 'text' ? 'on' : ''}
+
+        <DockButton
+          icon="text"
+          label="Text (T)"
+          on={tool === 'text'}
           onClick={() => props.onTool('text')}
-          title="Text (T)"
-        >
-          T
-        </button>
-        <button disabled title="Shapes — not implemented">
-          ⬠
-        </button>
-        <button onClick={props.onOpenTemplates} title="Templates">
-          ▤
-        </button>
-        <button disabled title="More — not implemented">
-          ⋯
-        </button>
+        />
+        <DockButton icon="shape" label="Shapes — not implemented" disabled />
+        <DockButton icon="template" label="Templates" onClick={props.onOpenTemplates} />
+        <DockButton icon="more" label="More — not implemented" disabled />
       </div>
     </>
   )

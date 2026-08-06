@@ -67,93 +67,92 @@
   pointer-events: none;
 }
 
-.toolbar,
-.zoom,
-.undo-pill,
-.pen-tray,
-.pen-popup {
-  position: absolute;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 14%), 0 0 2px rgb(0 0 0 / 12%);
-}
+/* --- bottom dock --------------------------------------------------------
+   Geometry measured from MS Whiteboard: 40x40 hit targets with 4px padding
+   around a 32x32 chip, buttons abutting with no gap, an 8px-radius white pill
+   8px off the bottom edge. See src/theme/ms-toolbar.json. */
 
-.toolbar,
-.zoom,
-.undo-pill,
-.pen-tray {
+.dock,
+.zoom {
+  position: absolute;
+  bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 0 2px rgb(0 0 0 / 10%), 0 4px 8px rgb(0 0 0 / 13%);
 }
 
-.toolbar {
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-}
+.toolbar { left: 50%; transform: translateX(-50%); }
 
-/* MS keeps undo in its own pill to the left of the tool pill. */
-.undo-pill {
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-320px);
-}
+/* Undo sits in its own pill, 12px to the left of the tool pill. */
+.undo-pill { left: 50%; transform: translateX(calc(-50% - 232px)); }
 
-.zoom { bottom: 20px; right: 20px; }
+.zoom { right: 8px; }
 
-/* The tray sits directly above the pen button. */
 .pen-tray {
-  bottom: 66px;
   left: 50%;
+  bottom: 56px;
   transform: translateX(-50%);
 }
 
-/* Direct children only -- the popup lives inside the tray and sizes its own
-   controls. */
-.toolbar button,
-.zoom button,
-.undo-pill button,
-.pen-tray > button {
-  position: relative;
-  min-width: 32px;
-  height: 32px;
-  padding: 0 8px;
+.dock-btn,
+.zoom button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 4px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 2px;
   background: transparent;
+  color: #000;
   font: inherit;
   cursor: pointer;
 }
-.toolbar button:hover:not(:disabled),
-.zoom button:hover,
-.undo-pill button:hover:not(:disabled),
-.pen-tray > button:hover:not(:disabled) { background: #f0f0f0; }
-.toolbar button.on,
-.pen-tray > button.on { background: #e8e0f4; }
-button:disabled { opacity: 0.35; cursor: default; }
 
-/* Colour dot under the pen tool, mirroring the selected pen. */
-.toolbar .pen-button .dot {
+/* The chip is what actually lights up -- MS paints state here, not on the
+   40px button, which keeps the hit target bigger than the visual. */
+.dock-btn .chip,
+.zoom button .chip {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+.dock-btn:hover:not(:disabled) .chip { background: #f0f0f0; }
+.dock-btn:active:not(:disabled) .chip { background: #e0e0e0; }
+.dock-btn.on .chip { background: #f0f0f0; }
+.dock-btn:disabled { color: #a19f9d; cursor: default; }
+.dock-btn:disabled .chip { background: transparent; }
+
+.ms-icon { display: grid; place-items: center; }
+.ms-icon svg { display: block; }
+.dock-btn .glyph { font-size: 15px; line-height: 1; }
+
+/* Redo is the undo glyph mirrored, as in MS. */
+.dock-btn.redo .ms-icon { transform: scaleX(-1); }
+
+/* Colour of the active pen, tucked under the pen glyph. */
+.dock-btn .pen-dot {
   position: absolute;
-  right: 5px;
-  bottom: 4px;
+  right: 3px;
+  bottom: 2px;
   width: 6px;
   height: 6px;
   border-radius: 50%;
 }
 
-.pen-tray .tray-pen { width: 34px; }
-.pen-tray .tray-pen .nib {
+.tray-pen .nib {
   display: block;
   width: 8px;
   height: 20px;
-  margin: 0 auto;
   border-radius: 2px 2px 4px 4px;
   clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
 }
-.pen-tray .tray-pen.highlighter .nib {
+.tray-pen.highlighter .nib {
   width: 14px;
   clip-path: none;
   border-radius: 2px;
@@ -161,9 +160,14 @@ button:disabled { opacity: 0.35; cursor: default; }
 }
 
 .zoom .label {
-  min-width: 52px;
+  width: 70px;
   font-variant-numeric: tabular-nums;
 }
+.zoom .label .chip { width: 62px; }
+
+/* Choosers hang above their 40px button. */
+.mini-flyout { position: relative; display: inline-flex; }
+.mini-flyout .mini-menu { bottom: 46px; }
 
 /* --- pen settings popup ------------------------------------------------- */
 

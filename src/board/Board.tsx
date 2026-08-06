@@ -33,6 +33,7 @@ import {
 import { DEFAULT_PENS, penSize, type Pen } from '../theme/palette'
 import { api, EMPTY_DOC, type BoardDoc } from '../api'
 import { navigate } from '../router'
+import { MsIcon } from '../theme/msIcons'
 import { instantiate, TEMPLATE_WIDTH, type Template } from '../templates/templates'
 import { TemplatePicker } from './TemplatePicker'
 import { ItemLayer } from './ItemLayer'
@@ -1121,18 +1122,39 @@ export function Board({ boardId }: { boardId: string }) {
         </div>
       )}
 
-      <div className="zoom">
-        <button onClick={() => zoomTo(vp.current.z / 1.25)} title="Zoom out">
-          −
+      <div className="zoom dock">
+        <button
+          className="dock-btn"
+          onClick={() => zoomTo(vp.current.z / 1.25)}
+          title="Zoom out"
+          aria-label="Zoom out"
+        >
+          <span className="chip">
+            <MsIcon name="zoomOut" />
+          </span>
         </button>
-        <button className="label" onClick={() => zoomTo(1)} title="Reset to 100%">
+        <button className="dock-btn label" onClick={() => zoomTo(1)} title="Reset to 100%">
           {zoomLabel}%
         </button>
-        <button onClick={() => zoomTo(vp.current.z * 1.25)} title="Zoom in">
-          +
+        <button
+          className="dock-btn"
+          onClick={() => zoomTo(vp.current.z * 1.25)}
+          title="Zoom in"
+          aria-label="Zoom in"
+        >
+          <span className="chip">
+            <MsIcon name="zoomIn" />
+          </span>
         </button>
-        <button onClick={fitToContent} title="Fit to content">
-          ⤢
+        <button
+          className="dock-btn"
+          onClick={fitToContent}
+          title="Fit to screen"
+          aria-label="Fit to screen"
+        >
+          <span className="chip">
+            <MsIcon name="fit" />
+          </span>
         </button>
       </div>
     </div>
