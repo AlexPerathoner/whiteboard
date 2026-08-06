@@ -34,6 +34,7 @@ import { DEFAULT_PENS, penSize, type Pen } from '../theme/palette'
 import { api, EMPTY_DOC, type BoardDoc } from '../api'
 import { navigate } from '../router'
 import { MsIcon } from '../theme/msIcons'
+import { NOTE_COLORS as MS_NOTE_COLORS } from '../theme/noteIcons'
 import { instantiate, TEMPLATE_WIDTH, type Template } from '../templates/templates'
 import { TemplatePicker } from './TemplatePicker'
 import { ItemLayer } from './ItemLayer'
@@ -51,8 +52,8 @@ const DEFAULT_TEXT_WIDTH = 480
 /** Notes are square in MS; this is one side, in world units. */
 const NOTE_SIZE = 200
 const REACTION_SIZE = 64
-/** MS's note colours. */
-const NOTE_COLORS = ['#FEF7A8', '#FBD3A5', '#F9B8C0', '#C8E6C9', '#B8DCF5', '#D9C7F0', '#E8E8E8']
+/** MS's note colours, measured from its own panel. */
+const NOTE_COLORS = Object.values(MS_NOTE_COLORS)
 const REACTIONS = [
   '👍', '👎', '❤️', '😀', '😂', '🎉',
   '😮', '😢', '😡', '🤔', '❓', '❗',

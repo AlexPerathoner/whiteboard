@@ -456,3 +456,41 @@
   cursor: pointer;
 }
 .placing-banner button:hover { background: rgb(255 255 255 / 28%); }
+
+/* MS's note panel: 320x80, two rows of 32px buttons at a 40px pitch, with the
+   add-note and note-grid actions occupying the first column. */
+/* MS centres this panel on the viewport and floats it 8px above the dock --
+   it is not anchored to the note button, so it must escape the flyout's
+   relative positioning. */
+.mini-menu.notes {
+  position: fixed;
+  left: 50%;
+  bottom: 56px;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(8, 40px);
+  grid-auto-rows: 40px;
+  grid-auto-flow: column;
+  gap: 0;
+  padding: 0;
+  /* Two rows tall, so the actions stack in column one. */
+  grid-template-rows: repeat(2, 40px);
+}
+.mini-menu.notes .note-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 4px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+.mini-menu.notes .note-btn:hover:not(:disabled) { background: #f0f0f0; }
+.mini-menu.notes .note-btn:active:not(:disabled) { background: #e0e0e0; }
+.mini-menu.notes .note-btn.on { background: #f0f0f0; }
+.mini-menu.notes .note-btn:disabled { opacity: 0.35; cursor: default; }
+.mini-menu.notes .ms-icon svg { display: block; }
+/* Close sits in the last column, vertically centred across both rows. */
+.mini-menu.notes .close-col { grid-column: 8; grid-row: 1 / span 2; height: 80px; }

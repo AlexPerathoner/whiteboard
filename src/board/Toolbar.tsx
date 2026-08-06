@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { EraserMode } from '../canvas/erase'
 import { highlighterIcon, INK_ICONS, penIcon } from '../theme/inkIcons'
 import { MsIcon, type MS_ICONS } from '../theme/msIcons'
+import { NOTE_COLORS, NOTE_COLOR_ORDER, NOTE_ICONS, noteSwatch } from '../theme/noteIcons'
 import { penSize, type Pen } from '../theme/palette'
 import { PenSettingsPopup } from './PenSettingsPopup'
 
@@ -93,6 +94,7 @@ function MiniFlyout({
   children,
   wide,
   grid,
+  notes,
 }: {
   open: boolean
   onToggle: () => void
@@ -101,6 +103,7 @@ function MiniFlyout({
   children: ReactNode
   wide?: boolean
   grid?: boolean
+  notes?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -117,7 +120,13 @@ function MiniFlyout({
     <div className="mini-flyout" ref={ref}>
       <span onClick={onToggle}>{button}</span>
       {open && (
-        <div className={`mini-menu ${wide ? 'wide' : ''} ${grid ? 'grid' : ''}`}>{children}</div>
+        <div
+          className={`mini-menu ${wide ? 'wide' : ''} ${grid ? 'grid' : ''} ${
+            notes ? 'notes' : ''
+          }`}
+        >
+          {children}
+        </div>
       )}
     </div>
   )
@@ -271,6 +280,7 @@ export function Toolbar(props: Props) {
         </DockButton>
 
         <MiniFlyout
+          notes
           open={menu === 'note'}
           onToggle={() => {
             props.onTool('note')
@@ -279,18 +289,41 @@ export function Toolbar(props: Props) {
           onClose={close}
           button={<DockButton icon="note" label="Note (N)" on={tool === 'note'} />}
         >
-          {props.noteColors.map((c) => (
-            <button
-              key={c}
-              className={`swatch ${c === props.noteColor ? 'on' : ''}`}
-              style={{ background: c }}
-              title={c}
-              onClick={() => {
-                props.onNoteColor(c)
-                close()
-              }}
-            />
-          ))}
+          {/* First column carries the two actions, as in MS. */}
+          <button
+            className="note-btn"
+            title="Add a note with the previously selected colour"
+            onClick={() => {
+              props.onNoteColor(props.noteColor)
+              close()
+            }}
+          >
+            <RawIcon html={NOTE_ICONS.addNote} />
+          </button>
+          <button className="note-btn" disabled title="Add note grid — not implemented">
+            <RawIcon html={NOTE_ICONS.grid} />
+          </button>
+          {NOTE_COLOR_ORDER.map((name) => {
+            const hex = NOTE_COLORS[name as keyof typeof NOTE_COLORS]
+            return (
+              <button
+                key={name}
+                className={`note-btn ${hex === props.noteColor ? 'on' : ''}`}
+                title={`Add ${name} note`}
+                onClick={() => {
+                  props.onNoteColor(hex)
+                  close()
+                }}
+              >
+                <RawIcon html={noteSwatch(hex)} />
+              </button>
+            )
+          })}
+          {/* MS closes the panel from an eighth column, which is what makes
+              the panel 320 wide rather than 280. */}
+          <button className="note-btn close-col" title="Close panel" onClick={close}>
+            ✕
+          </button>
         </MiniFlyout>
 
         <MiniFlyout

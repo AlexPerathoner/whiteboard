@@ -1,0 +1,40 @@
+/* eslint-disable */
+/**
+ * Note flyout icons and colours, captured from Microsoft Whiteboard's own
+ * "Add note or note grid" panel. Microsoft's assets; self-hosted personal use,
+ * not for distribution.
+ */
+
+/** MS's twelve note colours, in the order its panel lays them out. */
+export const NOTE_COLORS = {
+  "yellow": "#FFE6A1",
+  "soft orange": "#FCCD7A",
+  "orange": "#FBC19E",
+  "soft red": "#F18992",
+  "pink": "#ED99C9",
+  "green": "#CBE799",
+  "soft cyan": "#9BE0BA",
+  "soft blue": "#99D9EF",
+  "blue": "#9FB0FA",
+  "violet": "#C9A3DD",
+  "light gray": "#EBEBEB",
+  "gray": "#B6B6B6"
+}
+
+/** Row-major order of the panel: six per row, two rows. */
+export const NOTE_COLOR_ORDER: string[] = [
+  'yellow', 'soft orange', 'orange', 'soft red', 'pink', 'green',
+  'soft cyan', 'soft blue', 'blue', 'violet', 'light gray', 'gray',
+]
+
+const SWATCH_TEMPLATE = "<svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\"><path d=\"M3 6.2C3 4.43269 4.43269 3 6.2 3H17.8C19.5673 3 21 4.43269 21 6.2V13H16.2C14.4327 13 13 14.4327 13 16.2V21H6.2C4.43269 21 3 19.5673 3 17.8V6.2Z\" fill=\"__COLOR__\"></path><path d=\"M13.9685 20.9239C14.0887 20.8741 14.1991 20.8009 14.2929 20.7071L20.7071 14.2929C20.7926 14.2074 20.861 14.108 20.9102 14H16.2C14.985 14 14 14.985 14 16.2V20.9102C13.9896 20.9149 13.9791 20.9195 13.9685 20.9239Z\" fill=\"__COLOR__\"></path><path opacity=\"0.6\" fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M13 21H13.5858C13.851 21 14.1054 20.8946 14.2929 20.7071L20.7071 14.2929C20.8946 14.1054 21 13.851 21 13.5858V13H16.2C14.4327 13 13 14.4327 13 16.2V21Z\" fill=\"white\"></path><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M6.2 21C4.43269 21 3 19.5673 3 17.8V6.2C3 4.43269 4.43269 3 6.2 3H17.8C19.5673 3 21 4.43269 21 6.2V13.5858C21 13.7301 20.9688 13.8712 20.9102 14C20.9082 14.0044 20.9062 14.0087 20.9041 14.0131C20.8555 14.116 20.7892 14.2108 20.7071 14.2929L14.2929 20.7071C14.2074 20.7926 14.108 20.861 14 20.9102C13.9896 20.9149 13.9791 20.9195 13.9685 20.9239C13.8483 20.9737 13.7184 21 13.5858 21H6.2ZM6.2 4H17.8C19.015 4 20 4.98497 20 6.2V13H16.2C14.4327 13 13 14.4327 13 16.2V20H6.2C4.98497 20 4 19.015 4 17.8V6.2C4 4.98497 4.98497 4 6.2 4ZM14 19.5858L19.5858 14H16.2C14.985 14 14 14.985 14 16.2V19.5858Z\" fill=\"#2E2E2E\"></path></svg>"
+
+export const NOTE_ICONS = {
+  addNote: "<svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\"><path d=\"M14 3C15.5977 3 16.9037 4.24892 16.9949 5.82373L17 6V10H13L12.8237 10.0051C11.3072 10.093 10.093 11.3072 10.0051 12.8237L10 13V17H6C4.40232 17 3.09634 15.7511 3.00509 14.1763L3 14V6C3 4.40232 4.24892 3.09634 5.82373 3.00509L6 3H14ZM16.9007 11.001C16.8232 11.2376 16.7018 11.459 16.5416 11.6528L16.4142 11.7929L11.7929 16.4142C11.5687 16.6384 11.2968 16.8039 11.001 16.9007L11 13L11.0055 12.8507C11.078 11.8676 11.8612 11.0821 12.8433 11.006L13 11L16.9007 11.001Z\" fill=\"#2E2E2E\"></path></svg>",
+  grid: "<svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" focusable=\"false\"><path d=\"M7.5 11C8.32843 11 9 11.6716 9 12.5V16.5C9 17.3284 8.32843 18 7.5 18H3.5C2.67157 18 2 17.3284 2 16.5V12.5C2 11.6716 2.67157 11 3.5 11H7.5ZM16.5 11C17.3284 11 18 11.6716 18 12.5V16.5C18 17.3284 17.3284 18 16.5 18H12.5C11.6716 18 11 17.3284 11 16.5V12.5C11 11.6716 11.6716 11 12.5 11H16.5ZM7.5 12H3.5C3.22386 12 3 12.2239 3 12.5V16.5C3 16.7761 3.22386 17 3.5 17H7.5C7.77614 17 8 16.7761 8 16.5V12.5C8 12.2239 7.77614 12 7.5 12ZM16.5 12H12.5C12.2239 12 12 12.2239 12 12.5V16.5C12 16.7761 12.2239 17 12.5 17H16.5C16.7761 17 17 16.7761 17 16.5V12.5C17 12.2239 16.7761 12 16.5 12ZM7.5 2C8.32843 2 9 2.67157 9 3.5V7.5C9 8.32843 8.32843 9 7.5 9H3.5C2.67157 9 2 8.32843 2 7.5V3.5C2 2.67157 2.67157 2 3.5 2H7.5ZM16.5 2C17.3284 2 18 2.67157 18 3.5V7.5C18 8.32843 17.3284 9 16.5 9H12.5C11.6716 9 11 8.32843 11 7.5V3.5C11 2.67157 11.6716 2 12.5 2H16.5ZM7.5 3H3.5C3.22386 3 3 3.22386 3 3.5V7.5C3 7.77614 3.22386 8 3.5 8H7.5C7.77614 8 8 7.77614 8 7.5V3.5C8 3.22386 7.77614 3 7.5 3ZM16.5 3H12.5C12.2239 3 12 3.22386 12 3.5V7.5C12 7.77614 12.2239 8 12.5 8H16.5C16.7761 8 17 7.77614 17 7.5V3.5C17 3.22386 16.7761 3 16.5 3Z\" fill=\"#2E2E2E\"></path></svg>",
+}
+
+/** The note glyph filled with one of the colours above. */
+export function noteSwatch(color: string): string {
+  return SWATCH_TEMPLATE.replace(/__COLOR__/g, color)
+}
