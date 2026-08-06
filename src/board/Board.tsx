@@ -271,10 +271,14 @@ export function Board({ boardId }: { boardId: string }) {
   )
 
 
-  /** The only way to change tool: leaving the pen always closes its flyouts. */
+  /**
+   * The only way to change tool. Leaving the pen closes its flyouts -- except
+   * for the eraser, which lives inside that same tray and would otherwise
+   * dismiss the tray it was picked from.
+   */
   const setTool = (t: Tool) => {
     setToolState(t)
-    if (t !== 'pen') setPenFlyout('none')
+    if (t !== 'pen' && t !== 'eraser') setPenFlyout('none')
   }
 
   /** MS: picking the pen tool opens the tray; picking it again toggles it. */

@@ -171,6 +171,51 @@ export function Toolbar(props: Props) {
               </span>
             </button>
           ))}
+          <MiniFlyout
+            wide
+            open={menu === 'eraser'}
+            onToggle={() => {
+              // Same gesture as the pens: select it first, and only a second
+              // click on the already-active eraser opens its options.
+              if (tool === 'eraser') toggle('eraser')
+              else {
+                props.onTool('eraser')
+                close()
+              }
+            }}
+            onClose={close}
+            button={
+              <DockButton
+                label={
+                  props.eraserMode === 'stroke'
+                    ? 'Eraser (E) — whole stroke. Click again for options'
+                    : 'Eraser (E) — rub out. Click again for options'
+                }
+                on={tool === 'eraser'}
+              >
+                <span className="glyph">🧽</span>
+              </DockButton>
+            }
+          >
+            <button
+              className={props.eraserMode === 'stroke' ? 'on' : ''}
+              onClick={() => {
+                props.onEraserMode('stroke')
+                close()
+              }}
+            >
+              Whole stroke
+            </button>
+            <button
+              className={props.eraserMode === 'point' ? 'on' : ''}
+              onClick={() => {
+                props.onEraserMode('point')
+                close()
+              }}
+            >
+              Rub out
+            </button>
+          </MiniFlyout>
           <DockButton
             label="Ruler — ink snaps to its edge (or hold Shift while drawing)"
             on={props.rulerOn}
@@ -216,47 +261,6 @@ export function Toolbar(props: Props) {
         >
           <span className="pen-dot" style={{ background: pen.color }} />
         </DockButton>
-
-        <MiniFlyout
-          wide
-          open={menu === 'eraser'}
-          onToggle={() => {
-            props.onTool('eraser')
-            toggle('eraser')
-          }}
-          onClose={close}
-          button={
-            <DockButton
-              label={
-                props.eraserMode === 'stroke'
-                  ? 'Eraser (E) — removes a whole stroke on contact'
-                  : 'Eraser (E) — rubs out only what it touches'
-              }
-              on={tool === 'eraser'}
-            >
-              <span className="glyph">🧽</span>
-            </DockButton>
-          }
-        >
-          <button
-            className={props.eraserMode === 'stroke' ? 'on' : ''}
-            onClick={() => {
-              props.onEraserMode('stroke')
-              close()
-            }}
-          >
-            Whole stroke
-          </button>
-          <button
-            className={props.eraserMode === 'point' ? 'on' : ''}
-            onClick={() => {
-              props.onEraserMode('point')
-              close()
-            }}
-          >
-            Rub out
-          </button>
-        </MiniFlyout>
 
         <MiniFlyout
           open={menu === 'note'}
