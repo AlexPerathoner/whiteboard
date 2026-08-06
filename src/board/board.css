@@ -85,8 +85,14 @@
 
 .toolbar { left: 50%; transform: translateX(-50%); }
 
-/* Undo sits in its own pill, 12px to the left of the tool pill. */
-.undo-pill { left: 50%; transform: translateX(calc(-50% - 232px)); }
+/* Undo sits in its own pill, 12px to the left of the tool pill. Redo stacks
+   above undo rather than beside it, so the pill never changes width and the
+   undo button never shifts under the cursor when redo appears. */
+.undo-pill {
+  left: 50%;
+  transform: translateX(calc(-50% - 232px));
+  flex-direction: column-reverse;
+}
 
 .zoom { right: 8px; }
 
@@ -165,9 +171,22 @@
 }
 .zoom .label .chip { width: 62px; }
 
-/* Choosers hang above their 40px button. */
+/* Choosers hang above their 40px button, and open on click. */
 .mini-flyout { position: relative; display: inline-flex; }
-.mini-flyout .mini-menu { bottom: 46px; }
+.mini-flyout .mini-menu {
+  position: absolute;
+  bottom: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 0 2px rgb(0 0 0 / 10%), 0 4px 8px rgb(0 0 0 / 13%);
+}
+.mini-menu .swatch.on,
+.mini-menu .emoji.on { outline: 2px solid #5b318d; outline-offset: 1px; }
 
 /* --- pen settings popup ------------------------------------------------- */
 
@@ -380,19 +399,6 @@
 
 /* Small hover chooser above the note / reaction buttons. */
 .mini-flyout { position: relative; display: inline-flex; }
-.mini-flyout .mini-menu {
-  position: absolute;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: none;
-  gap: 4px;
-  padding: 6px;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 18%);
-}
-.mini-flyout:hover .mini-menu { display: flex; }
 .mini-menu .swatch {
   width: 22px;
   min-width: 22px;

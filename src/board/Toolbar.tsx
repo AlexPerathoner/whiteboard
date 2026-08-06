@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { EraserMode } from '../canvas/erase'
 import { MsIcon, type MS_ICONS } from '../theme/msIcons'
 import { penSize, type Pen } from '../theme/palette'
@@ -76,6 +76,44 @@ function DockButton({
 }
 
 /**
+ * A chooser that opens on click, not hover: a menu that appears when the
+ * pointer merely passes over the dock fires constantly while drawing.
+ */
+function MiniFlyout({
+  open,
+  onToggle,
+  onClose,
+  button,
+  children,
+  wide,
+}: {
+  open: boolean
+  onToggle: () => void
+  onClose: () => void
+  button: ReactNode
+  children: ReactNode
+  wide?: boolean
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const away = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) onClose()
+    }
+    // Capture phase, so the canvas cannot swallow the press first.
+    document.addEventListener('pointerdown', away, true)
+    return () => document.removeEventListener('pointerdown', away, true)
+  }, [open, onClose])
+
+  return (
+    <div className="mini-flyout" ref={ref}>
+      <span onClick={onToggle}>{button}</span>
+      {open && <div className={`mini-menu ${wide ? 'wide' : ''}`}>{children}</div>}
+    </div>
+  )
+}
+
+/**
  * Bottom dock, rebuilt against the real thing: an undo pill, a 12px gap, then
  * the tool pill. Geometry, radii, shadow and state colours are measured from
  * MS rather than guessed -- see src/theme/ms-toolbar.json.
@@ -83,6 +121,9 @@ function DockButton({
 export function Toolbar(props: Props) {
   const { tool, pens, penIndex, penFlyout, recent } = props
   const pen = pens[penIndex]
+  const [menu, setMenu] = useState<'eraser' | 'note' | 'reaction' | null>(null)
+  const toggle = (m: 'eraser' | 'note' | 'reaction') => setMenu((cur) => (cur === m ? null : m))
+  const close = () => setMenu(null)
 
   return (
     <>
@@ -172,69 +213,92 @@ export function Toolbar(props: Props) {
           <span className="pen-dot" style={{ background: pen.color }} />
         </DockButton>
 
-        <div className="mini-flyout">
-          <DockButton
-            label={
-              props.eraserMode === 'stroke'
-                ? 'Eraser (E) — removes a whole stroke on contact'
-                : 'Eraser (E) — rubs out only what it touches'
-            }
-            on={tool === 'eraser'}
-            onClick={() => props.onTool('eraser')}
+        <MiniFlyout
+          wide
+          open={menu === 'eraser'}
+          onToggle={() => {
+            props.onTool('eraser')
+            toggle('eraser')
+          }}
+          onClose={close}
+          button={
+            <DockButton
+              label={
+                props.eraserMode === 'stroke'
+                  ? 'Eraser (E) — removes a whole stroke on contact'
+                  : 'Eraser (E) — rubs out only what it touches'
+              }
+              on={tool === 'eraser'}
+            >
+              <span className="glyph">🧽</span>
+            </DockButton>
+          }
+        >
+          <button
+            className={props.eraserMode === 'stroke' ? 'on' : ''}
+            onClick={() => {
+              props.onEraserMode('stroke')
+              close()
+            }}
           >
-            <span className="glyph">🧽</span>
-          </DockButton>
-          <div className="mini-menu wide">
-            <button
-              className={props.eraserMode === 'stroke' ? 'on' : ''}
-              onClick={() => props.onEraserMode('stroke')}
-            >
-              Whole stroke
-            </button>
-            <button
-              className={props.eraserMode === 'point' ? 'on' : ''}
-              onClick={() => props.onEraserMode('point')}
-            >
-              Rub out
-            </button>
-          </div>
-        </div>
+            Whole stroke
+          </button>
+          <button
+            className={props.eraserMode === 'point' ? 'on' : ''}
+            onClick={() => {
+              props.onEraserMode('point')
+              close()
+            }}
+          >
+            Rub out
+          </button>
+        </MiniFlyout>
 
-        <div className="mini-flyout">
-          <DockButton
-            icon="note"
-            label="Note (N)"
-            on={tool === 'note'}
-            onClick={() => props.onTool('note')}
-          />
-          <div className="mini-menu">
-            {props.noteColors.map((c) => (
-              <button
-                key={c}
-                className="swatch"
-                style={{ background: c }}
-                title={c}
-                onClick={() => props.onNoteColor(c)}
-              />
-            ))}
-          </div>
-        </div>
+        <MiniFlyout
+          open={menu === 'note'}
+          onToggle={() => {
+            props.onTool('note')
+            toggle('note')
+          }}
+          onClose={close}
+          button={<DockButton icon="note" label="Note (N)" on={tool === 'note'} />}
+        >
+          {props.noteColors.map((c) => (
+            <button
+              key={c}
+              className={`swatch ${c === props.noteColor ? 'on' : ''}`}
+              style={{ background: c }}
+              title={c}
+              onClick={() => {
+                props.onNoteColor(c)
+                close()
+              }}
+            />
+          ))}
+        </MiniFlyout>
 
-        <div className="mini-flyout">
-          <DockButton
-            icon="reaction"
-            label="Reaction (R)"
-            on={tool === 'reaction'}
-            onClick={() => props.onTool('reaction')}
-          />
-          <div className="mini-menu">
-            {props.reactions.map((r) => (
-              <button key={r} className="emoji" onClick={() => props.onReaction(r)}>
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
+        <MiniFlyout
+          open={menu === 'reaction'}
+          onToggle={() => {
+            props.onTool('reaction')
+            toggle('reaction')
+          }}
+          onClose={close}
+          button={<DockButton icon="reaction" label="Reaction (R)" on={tool === 'reaction'} />}
+        >
+          {props.reactions.map((r) => (
+            <button
+              key={r}
+              className={`emoji ${r === props.reaction ? 'on' : ''}`}
+              onClick={() => {
+                props.onReaction(r)
+                close()
+              }}
+            >
+              {r}
+            </button>
+          ))}
+        </MiniFlyout>
 
         <DockButton
           icon="text"

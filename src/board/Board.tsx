@@ -847,6 +847,13 @@ export function Board({ boardId }: { boardId: string }) {
   }, [extend])
 
   const onPointerMove = (e: React.PointerEvent) => {
+    // The eraser has no visible cursor of its own, so its ring has to follow
+    // the pointer whenever the tool is armed -- not just while erasing.
+    if (tool === 'eraser' && !drag.current) {
+      const [ox, oy] = origin.current
+      drawOverlay(null, [e.clientX - ox, e.clientY - oy])
+      return
+    }
     if (placing.current) {
       const [ox, oy] = origin.current
       ghostAt.current = [e.clientX - ox, e.clientY - oy]
@@ -1042,6 +1049,9 @@ export function Board({ boardId }: { boardId: string }) {
         onPointerMove={onPointerMove}
         onPointerUp={finish}
         onPointerCancel={finish}
+        onPointerLeave={() => {
+          if (tool === 'eraser' && !drag.current) drawOverlay()
+        }}
         onContextMenu={(e) => e.preventDefault()}
       >
         <canvas ref={committedRef} />
