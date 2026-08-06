@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { EraserMode } from '../canvas/erase'
+import { highlighterIcon, INK_ICONS, penIcon } from '../theme/inkIcons'
 import { MsIcon, type MS_ICONS } from '../theme/msIcons'
 import { penSize, type Pen } from '../theme/palette'
 import { PenSettingsPopup } from './PenSettingsPopup'
@@ -73,6 +74,11 @@ function DockButton({
       </span>
     </button>
   )
+}
+
+/** Raw captured markup, injected the same way the dock icons are. */
+function RawIcon({ html }: { html: string }) {
+  return <span className="ms-icon" aria-hidden="true" dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 /**
@@ -167,7 +173,9 @@ export function Toolbar(props: Props) {
               onClick={() => props.onPickPen(i)}
             >
               <span className="chip">
-                <span className="nib" style={{ background: p.color }} />
+                <RawIcon
+                  html={p.tool === 'highlighter' ? highlighterIcon(p.color) : penIcon(p.color)}
+                />
               </span>
             </button>
           ))}
@@ -193,7 +201,7 @@ export function Toolbar(props: Props) {
                 }
                 on={tool === 'eraser'}
               >
-                <span className="glyph">🧽</span>
+                <RawIcon html={INK_ICONS.eraser} />
               </DockButton>
             }
           >
@@ -224,10 +232,10 @@ export function Toolbar(props: Props) {
             <span className="glyph">📐</span>
           </DockButton>
           <DockButton label="Lasso select — not implemented" disabled>
-            <span className="glyph">⌖</span>
+            <RawIcon html={INK_ICONS.lasso} />
           </DockButton>
-          <DockButton label="Close" onClick={props.onCloseTray}>
-            <span className="glyph">✕</span>
+          <DockButton label="Exit ink mode" onClick={props.onCloseTray}>
+            <RawIcon html={INK_ICONS.exit} />
           </DockButton>
           {penFlyout === 'settings' && (
             <PenSettingsPopup

@@ -83,14 +83,17 @@
   box-shadow: 0 0 2px rgb(0 0 0 / 10%), 0 4px 8px rgb(0 0 0 / 13%);
 }
 
-.toolbar { left: 50%; transform: translateX(-50%); }
+/* MS centres the *whole* group -- undo pill, 12px gap, tool pill -- on the
+   viewport, not the tool pill alone. Measured at 1512px wide: undo at x=550,
+   tools at x=602 with width 360, so the group spans 550..962 and its centre
+   lands exactly on 756. Centring the tool pill instead pushes everything 26px
+   left of where MS puts it. */
+.toolbar { left: calc(50% - 154px); }
 
-/* Undo sits in its own pill, 12px to the left of the tool pill. Redo stacks
-   above undo rather than beside it, so the pill never changes width and the
-   undo button never shifts under the cursor when redo appears. */
+/* Redo stacks above undo rather than beside it, so the pill never changes
+   width and undo never shifts out from under the cursor when redo appears. */
 .undo-pill {
-  left: 50%;
-  transform: translateX(calc(-50% - 232px));
+  left: calc(50% - 206px);
   flex-direction: column-reverse;
 }
 
@@ -151,19 +154,10 @@
   border-radius: 50%;
 }
 
-.tray-pen .nib {
-  display: block;
-  width: 8px;
-  height: 20px;
-  border-radius: 2px 2px 4px 4px;
-  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
-}
-.tray-pen.highlighter .nib {
-  width: 14px;
-  clip-path: none;
-  border-radius: 2px;
-  opacity: 0.75;
-}
+/* MS's pen illustrations are 40x40 and deliberately overflow the 32px chip --
+   the nib runs to the bottom edge of the button. */
+.pen-tray .tray-pen .chip { overflow: visible; }
+.pen-tray .tray-pen .ms-icon svg { width: 40px; height: 40px; }
 
 .zoom .label {
   width: 70px;
