@@ -12,6 +12,9 @@ export interface Template {
   id: string
   name: string
   category: string
+  /** What the layout is for. Written here rather than lifted from MS, whose
+   *  wording is their copy. */
+  description: string
   /** Shape rects, normalised: [x, y, w, h] in a 1000-wide space. */
   shapes: [number, number, number, number][]
   /** Short structural labels: [text, x, y, w, h]. */
@@ -74,6 +77,31 @@ const MS_CATEGORY_NAMES = new Set([
   'Recommended',
 ])
 
+/** One line on what each layout is for, keyed by template name. */
+const DESCRIPTION: Record<string, string> = {
+  'Affinity diagram': 'Cluster loose ideas into themes, then name each cluster.',
+  Brainstorm: 'One prompt, open space beneath it for ideas.',
+  Moodboard: 'A collage grid for images and references that set a direction.',
+  'Topic Brainstorm': 'Five parallel topics, so a group can diverge without collisions.',
+  'Empathy map': 'What a person thinks, sees, says and hears, in six quadrants.',
+  'Feedback grid': 'Sort feedback into what worked, what to change, questions and ideas.',
+  'Kano model': 'Plot features against satisfaction and functionality.',
+  'Simple journey map': 'Stages across the top; actions, feelings, touch points and openings down the side.',
+  Storyboarding: 'Six framed scenes with room for a title and description each.',
+  'User Interviews': 'Paired question and answer columns for three interviews.',
+  'Assumption grid': 'Rank assumptions by risk and certainty, with space for follow-ups.',
+  'Cost/benefit analysis': 'Place options on cost against benefit to see what is worth doing.',
+  'Importance/feasibility analysis': 'Weigh how much something matters against how hard it is.',
+  'Feature goals': 'Goal, hypothesis, success criteria and audience for one feature.',
+  'Goal setting': 'Define what you are aiming at, and explicitly what you are not.',
+  'Pros and cons': 'Two columns for arguments either way.',
+  SMART: 'Specific, measurable, attainable, relevant, timely -- one column each.',
+  'SWOT analysis': 'Strengths, weaknesses, opportunities and threats in four quadrants.',
+  'Success Metrics': 'Goals, actions, metrics and tracking side by side.',
+  'Daily stand-up': 'Yesterday, today and blockers, one column per question.',
+  'Jobs to be done': 'Customer motivation, challenges, and the job they are hiring you for.',
+}
+
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
 export const TEMPLATES: Template[] = Object.entries(
@@ -82,6 +110,7 @@ export const TEMPLATES: Template[] = Object.entries(
   id: slug(name),
   name,
   category: CATEGORY[name] ?? 'Other',
+  description: DESCRIPTION[name] ?? '',
   h: t.h,
   shapes: t.s as [number, number, number, number][],
   labels: (t.t as [string, number, number, number, number][]).filter(

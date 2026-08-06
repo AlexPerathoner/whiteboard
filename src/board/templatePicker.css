@@ -111,3 +111,40 @@
   color: #605e5c;
   font-size: 12px;
 }
+
+.template-panel .card.on {
+  border-color: #5b318d;
+  box-shadow: 0 0 0 1px #5b318d;
+}
+
+.template-panel .preview {
+  flex: 0 0 260px;
+  padding: 16px;
+  border-left: 1px solid #edebe9;
+  overflow-y: auto;
+}
+.template-panel .preview .big {
+  height: 150px;
+  margin-bottom: 12px;
+  border: 1px solid #e1dfdd;
+  border-radius: 6px;
+  background: #faf9f8;
+}
+.template-panel .preview .big .thumb { width: 100%; height: 100%; }
+.template-panel .preview h2 { margin: 0; font-size: 15px; }
+.template-panel .preview .cat { margin: 2px 0 10px; color: #605e5c; font-size: 12px; }
+.template-panel .preview .desc { margin: 0 0 10px; }
+.template-panel .preview .meta { margin: 0 0 14px; color: #605e5c; font-size: 12px; }
+.template-panel .preview .place {
+  width: 100%;
+  padding: 9px;
+  border: 0;
+  border-radius: 4px;
+  background: #0f6cbd;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.template-panel .preview .place:hover { background: #115ea3; }
+.template-panel .preview .hint { margin: 8px 0 0; color: #605e5c; font-size: 12px; }

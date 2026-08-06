@@ -50,6 +50,7 @@ function Thumb({ t }: { t: Template }) {
 }
 
 interface Props {
+  /** Arms placement; the board then follows the cursor until a click. */
   onPick: (t: Template) => void
   onClose: () => void
 }
@@ -57,6 +58,9 @@ interface Props {
 export function TemplatePicker({ onPick, onClose }: Props) {
   const [category, setCategory] = useState<string>('All')
   const [query, setQuery] = useState('')
+  // Selecting a card previews it; only "Place on board" arms placement, so a
+  // misclick in the gallery cannot drop a template on the canvas.
+  const [preview, setPreview] = useState<Template | null>(null)
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -108,7 +112,12 @@ export function TemplatePicker({ onPick, onClose }: Props) {
 
           <div className="grid">
             {shown.map((t) => (
-              <button key={t.id} className="card" onClick={() => onPick(t)} title={`Add ${t.name}`}>
+              <button
+                key={t.id}
+                className={`card ${preview?.id === t.id ? 'on' : ''}`}
+                onClick={() => setPreview(t)}
+                title={t.name}
+              >
                 <Thumb t={t} />
                 <span className="name">{t.name}</span>
                 <span className="cat">{t.category}</span>
@@ -116,6 +125,25 @@ export function TemplatePicker({ onPick, onClose }: Props) {
             ))}
             {shown.length === 0 && <p className="empty">Nothing matches “{query}”.</p>}
           </div>
+
+          {preview && (
+            <aside className="preview">
+              <div className="big">
+                <Thumb t={preview} />
+              </div>
+              <h2>{preview.name}</h2>
+              <p className="cat">{preview.category}</p>
+              <p className="desc">{preview.description}</p>
+              <p className="meta">
+                {preview.shapes.length} zones · {preview.labels.length} labels
+                {preview.noteCount > 0 ? ` · ${preview.noteCount} starter notes (not placed yet)` : ''}
+              </p>
+              <button className="place" onClick={() => onPick(preview)}>
+                Place on board
+              </button>
+              <p className="hint">Then click where you want it. Esc cancels.</p>
+            </aside>
+          )}
         </div>
 
         <footer>

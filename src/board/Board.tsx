@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { History } from '../canvas/history'
 import { InkEngine } from '../canvas/inkEngine'
+import { splitStroke, touches, type EraserMode } from '../canvas/erase'
 import { OverlayLayer, type Rect } from '../canvas/overlay'
 import {
   clampRuler,
@@ -73,7 +74,7 @@ type Drag =
   | { kind: 'ink' }
   | { kind: 'pan'; lastX: number; lastY: number }
   | { kind: 'marquee'; start: [number, number]; rect: Rect }
-  | { kind: 'erase'; removed: { stroke: Stroke; index: number }[] }
+  | { kind: 'erase'; before: Stroke[] }
   | { kind: 'ruler'; grab: Exclude<RulerGrab, null>; last: [number, number] }
   | {
       kind: 'move'
@@ -138,8 +139,13 @@ export function Board({ boardId }: { boardId: string }) {
   const [items, setItems] = useState<DomItem[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  /** Template armed for placement; follows the cursor until a click. */
+  const placing = useRef<Template | null>(null)
+  const ghostAt = useRef<[number, number] | null>(null)
+  const [placingName, setPlacingName] = useState<string | null>(null)
   const [noteColor, setNoteColor] = useState(NOTE_COLORS[0])
   const [reaction, setReaction] = useState(REACTIONS[0])
+  const [eraserMode, setEraserMode] = useState<EraserMode>('stroke')
   // Selection is a ref so the pointer handlers can mutate it and redraw the
   // overlay synchronously; this forces the render that lets the text layer
   // show its selected state.
@@ -241,6 +247,9 @@ export function Board({ boardId }: { boardId: string }) {
 
   const drawOverlay = useCallback(
     (marquee: Rect | null = null, eraser: [number, number] | null = null) => {
+      const t = placing.current
+      const at = ghostAt.current
+      const w = TEMPLATE_WIDTH * vp.current.z
       overlay.current?.draw(
         vp.current,
         selectionBounds(),
@@ -248,6 +257,9 @@ export function Board({ boardId }: { boardId: string }) {
         eraser,
         ERASER_RADIUS_PX,
         ruler.current,
+        t && at
+          ? { rects: t.shapes, x: at[0] - w / 2, y: at[1] - (t.h / 1000) * w / 2, w, h: (t.h / 1000) * w }
+          : null,
       )
     },
     [selectionBounds],
@@ -316,14 +328,32 @@ export function Board({ boardId }: { boardId: string }) {
    * Stroke eraser, as MS does by default: touching any part of a stroke
    * removes the whole thing rather than cutting a hole in it.
    */
-  const eraseAt = useCallback((wx: number, wy: number, d: { removed: { stroke: Stroke; index: number }[] }) => {
-    const l = layer.current!
-    const hit = l.hitTest(wx, wy, ERASER_RADIUS_PX / vp.current.z)
-    if (!hit) return
-    // Index captured before removal so undo restores the original depth.
-    d.removed.push({ stroke: hit, index: l.indexOfStroke(hit.id) })
-    l.remove(new Set([hit.id]))
-  }, [])
+  const eraseAt = useCallback(
+    (wx: number, wy: number, mode: EraserMode) => {
+      const l = layer.current!
+      const r = ERASER_RADIUS_PX / vp.current.z
+      const probe: Rect = [wx - r, wy - r, wx + r, wy + r]
+      let changed = false
+      const next: Stroke[] = []
+      for (const s of l.strokes) {
+        const near =
+          s.bounds[0] <= probe[2] &&
+          s.bounds[2] >= probe[0] &&
+          s.bounds[1] <= probe[3] &&
+          s.bounds[3] >= probe[1]
+        if (!near || !touches(s, wx, wy, r)) {
+          next.push(s)
+          continue
+        }
+        changed = true
+        // Stroke mode drops the whole thing; point mode keeps what the disc
+        // did not cover, which can leave two pieces where it cut through.
+        if (mode === 'point') next.push(...splitStroke(s, wx, wy, r))
+      }
+      if (changed) l.setStrokes(next)
+    },
+    [],
+  )
 
   const deleteSelection = useCallback(() => {
     const l = layer.current!
@@ -364,15 +394,27 @@ export function Board({ boardId }: { boardId: string }) {
    * Drops a template into the middle of the current view as one undoable
    * command -- backdrop zones plus their labels together.
    */
-  const insertTemplate = useCallback(
-    (t: Template) => {
-      setPickerOpen(false)
-      const stage = stageRef.current!
+  /** Arms placement: the ghost follows the cursor until a click drops it. */
+  const armTemplate = useCallback((t: Template) => {
+    setPickerOpen(false)
+    placing.current = t
+    ghostAt.current = null
+    setPlacingName(t.name)
+  }, [])
+
+  const cancelPlacing = useCallback(() => {
+    placing.current = null
+    ghostAt.current = null
+    setPlacingName(null)
+    drawOverlay()
+  }, [drawOverlay])
+
+  const dropTemplate = useCallback(
+    (t: Template, centreX: number, centreY: number) => {
       const l = layer.current!
       const width = TEMPLATE_WIDTH
       const height = (t.h / 1000) * width
-      const [cx, cy] = screenToWorld(vp.current, stage.clientWidth / 2, stage.clientHeight / 2)
-      const { zones, texts } = instantiate(t, cx - width / 2, cy - height / 2, width)
+      const { zones, texts } = instantiate(t, centreX - width / 2, centreY - height / 2, width)
       const ids = new Set(zones.map((z) => z.id))
       history.current!.push({
         label: `template ${t.name}`,
@@ -386,8 +428,9 @@ export function Board({ boardId }: { boardId: string }) {
           setItems((list) => list.filter((x) => !textIds.has(x.id)))
         },
       })
+      cancelPlacing()
     },
-    [],
+    [cancelPlacing],
   )
 
   /** Blur of a text box: create, update or discard. */
@@ -550,6 +593,10 @@ export function Board({ boardId }: { boardId: string }) {
         e.preventDefault()
         deleteSelection()
       }
+      if (e.key === 'Escape' && placing.current) {
+        cancelPlacing()
+        return
+      }
       if (e.key === 'Escape') {
         selection.current = new Set()
         bumpSelection()
@@ -667,10 +714,18 @@ export function Board({ boardId }: { boardId: string }) {
 
     if (tool === 'eraser') {
       capturePointer(stage, e.pointerId)
-      const d = { kind: 'erase' as const, removed: [] }
-      drag.current = d
-      eraseAt(wx, wy, d)
+      // Snapshot rather than per-stroke bookkeeping: a point-erase drag can
+      // rewrite the same stroke repeatedly, so one before/after pair is both
+      // simpler and exactly right.
+      drag.current = { kind: 'erase', before: [...layer.current!.strokes] }
+      eraseAt(wx, wy, eraserMode)
       drawOverlay(null, [e.clientX - ox, e.clientY - oy])
+      return
+    }
+
+    if (placing.current) {
+      e.preventDefault()
+      dropTemplate(placing.current, wx, wy)
       return
     }
 
@@ -791,6 +846,12 @@ export function Board({ boardId }: { boardId: string }) {
   }, [extend])
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (placing.current) {
+      const [ox, oy] = origin.current
+      ghostAt.current = [e.clientX - ox, e.clientY - oy]
+      drawOverlay()
+      return
+    }
     if (activePointer.current !== e.pointerId) return
     const d = drag.current
     if (!d) return
@@ -824,7 +885,7 @@ export function Board({ boardId }: { boardId: string }) {
       const sx = e.clientX - ox
       const sy = e.clientY - oy
       const [wx, wy] = screenToWorld(vp.current, sx, sy)
-      eraseAt(wx, wy, d)
+      eraseAt(wx, wy, eraserMode)
       drawOverlay(null, [sx, sy])
       return
     }
@@ -866,15 +927,14 @@ export function Board({ boardId }: { boardId: string }) {
 
     if (d?.kind === 'erase') {
       drawOverlay()
-      if (d.removed.length === 0) return
-      const ids = new Set(d.removed.map((x) => x.stroke.id))
-      const removed = d.removed
-      // Already gone from the live drag, so `do` is a no-op the first time and
-      // only matters on redo -- one command per drag, not per stroke.
+      const after = [...l.strokes]
+      if (after.length === d.before.length && after.every((s, i) => s === d.before[i])) return
+      const before = d.before
+      // Already applied by the live drag, so `do` only matters on redo.
       history.current!.push({
         label: 'erase',
-        do: () => l.remove(ids),
-        undo: () => l.insertAt(removed),
+        do: () => l.setStrokes([...after]),
+        undo: () => l.setStrokes([...before]),
       })
       return
     }
@@ -1021,6 +1081,11 @@ export function Board({ boardId }: { boardId: string }) {
         onChangePen={onChangePen}
         onToggleRuler={toggleRuler}
         onOpenTemplates={() => setPickerOpen(true)}
+        eraserMode={eraserMode}
+        onEraserMode={(m) => {
+          setEraserMode(m)
+          setTool('eraser')
+        }}
         noteColors={NOTE_COLORS}
         noteColor={noteColor}
         onNoteColor={(c) => {
@@ -1046,7 +1111,14 @@ export function Board({ boardId }: { boardId: string }) {
       />
 
       {pickerOpen && (
-        <TemplatePicker onPick={insertTemplate} onClose={() => setPickerOpen(false)} />
+        <TemplatePicker onPick={armTemplate} onClose={() => setPickerOpen(false)} />
+      )}
+
+      {placingName && (
+        <div className="placing-banner">
+          Click to place <strong>{placingName}</strong>
+          <button onClick={cancelPlacing}>Cancel</button>
+        </div>
       )}
 
       <div className="zoom">

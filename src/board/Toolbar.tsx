@@ -1,3 +1,4 @@
+import type { EraserMode } from '../canvas/erase'
 import { penSize, type Pen } from '../theme/palette'
 import { PenSettingsPopup } from './PenSettingsPopup'
 
@@ -21,6 +22,8 @@ interface Props {
   onChangePen: (next: Pen) => void
   onToggleRuler: () => void
   onOpenTemplates: () => void
+  eraserMode: EraserMode
+  onEraserMode: (m: EraserMode) => void
   noteColors: string[]
   noteColor: string
   onNoteColor: (c: string) => void
@@ -119,13 +122,33 @@ export function Toolbar(props: Props) {
           ✒️
           <span className="dot" style={{ background: pen.color }} />
         </button>
-        <button
-          className={tool === 'eraser' ? 'on' : ''}
-          onClick={() => props.onTool('eraser')}
-          title="Eraser (E) — removes whole strokes"
-        >
-          🧽
-        </button>
+        <div className="mini-flyout">
+          <button
+            className={tool === 'eraser' ? 'on' : ''}
+            onClick={() => props.onTool('eraser')}
+            title={
+              props.eraserMode === 'stroke'
+                ? 'Eraser (E) — removes a whole stroke on contact'
+                : 'Eraser (E) — rubs out only what it touches'
+            }
+          >
+            🧽
+          </button>
+          <div className="mini-menu wide">
+            <button
+              className={props.eraserMode === 'stroke' ? 'on' : ''}
+              onClick={() => props.onEraserMode('stroke')}
+            >
+              Whole stroke
+            </button>
+            <button
+              className={props.eraserMode === 'point' ? 'on' : ''}
+              onClick={() => props.onEraserMode('point')}
+            >
+              Rub out
+            </button>
+          </div>
+        </div>
         {/* Note and reaction each open a small chooser, as MS does. */}
         <div className="mini-flyout">
           <button

@@ -46,6 +46,8 @@ export class OverlayLayer {
     eraser: [number, number] | null = null,
     eraserRadius = 12,
     ruler: RulerState | null = null,
+    /** Template being placed: normalised rects plus its screen box. */
+    ghost: { rects: [number, number, number, number][]; x: number; y: number; w: number; h: number } | null = null,
   ) {
     const ctx = this.ctx
     this.clear()
@@ -81,6 +83,22 @@ export class OverlayLayer {
       ctx.lineWidth = 1
       ctx.fillRect(x, y, w, h)
       ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.round(w), Math.round(h))
+      ctx.restore()
+    }
+
+    if (ghost) {
+      // Outline only: a filled preview would hide what it is being placed over.
+      ctx.save()
+      const k = ghost.w / 1000
+      ctx.strokeStyle = '#5B318D'
+      ctx.fillStyle = 'rgba(91, 49, 141, 0.06)'
+      ctx.lineWidth = 1
+      ctx.fillRect(ghost.x, ghost.y, ghost.w, ghost.h)
+      ctx.strokeRect(ghost.x + 0.5, ghost.y + 0.5, ghost.w, ghost.h)
+      ctx.strokeStyle = 'rgba(91, 49, 141, 0.55)'
+      for (const [rx, ry, rw, rh] of ghost.rects) {
+        ctx.strokeRect(ghost.x + rx * k, ghost.y + ry * k, rw * k, rh * k)
+      }
       ctx.restore()
     }
 
