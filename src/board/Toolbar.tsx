@@ -238,7 +238,7 @@ export function Toolbar(props: Props) {
             on={props.rulerOn}
             onClick={props.onToggleRuler}
           >
-            <span className="glyph">📐</span>
+            <RawIcon html={INK_ICONS.ruler} />
           </DockButton>
           <DockButton label="Lasso select — not implemented" disabled>
             <RawIcon html={INK_ICONS.lasso} />

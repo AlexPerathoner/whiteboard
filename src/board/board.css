@@ -154,10 +154,20 @@
   border-radius: 50%;
 }
 
-/* MS's pen illustrations are 40x40 and deliberately overflow the 32px chip --
-   the nib runs to the bottom edge of the button. */
-.pen-tray .tray-pen .chip { overflow: visible; }
-.pen-tray .tray-pen .ms-icon svg { width: 40px; height: 40px; }
+/* The pen and ruler illustrations are drawn on a 40x40 canvas -- the same size
+   as the whole button -- so their chip has no inset and the artwork is clipped
+   to the button rather than spilling over its neighbours. */
+.pen-tray .tray-pen,
+.pen-tray .dock-btn:has(svg[width="40"]) {
+  padding: 0;
+}
+.pen-tray .tray-pen .chip,
+.pen-tray .dock-btn:has(svg[width="40"]) .chip {
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+}
+.pen-tray .ms-icon svg[width="40"] { width: 40px; height: 40px; }
 
 .zoom .label {
   width: 70px;
@@ -181,6 +191,17 @@
 }
 .mini-menu .swatch.on,
 .mini-menu .emoji.on { outline: 2px solid #5b318d; outline-offset: 1px; }
+
+/* The settings popup is its own surface. It sits inside the tray for
+   anchoring, so without an explicit background the tray's pens show straight
+   through it. */
+.pen-popup {
+  position: absolute;
+  z-index: 3;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 0 2px rgb(0 0 0 / 10%), 0 4px 8px rgb(0 0 0 / 13%);
+}
 
 /* --- pen settings popup ------------------------------------------------- */
 
