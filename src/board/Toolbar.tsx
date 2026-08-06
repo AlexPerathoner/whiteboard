@@ -86,6 +86,7 @@ function MiniFlyout({
   button,
   children,
   wide,
+  grid,
 }: {
   open: boolean
   onToggle: () => void
@@ -93,6 +94,7 @@ function MiniFlyout({
   button: ReactNode
   children: ReactNode
   wide?: boolean
+  grid?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -108,7 +110,9 @@ function MiniFlyout({
   return (
     <div className="mini-flyout" ref={ref}>
       <span onClick={onToggle}>{button}</span>
-      {open && <div className={`mini-menu ${wide ? 'wide' : ''}`}>{children}</div>}
+      {open && (
+        <div className={`mini-menu ${wide ? 'wide' : ''} ${grid ? 'grid' : ''}`}>{children}</div>
+      )}
     </div>
   )
 }
@@ -278,6 +282,7 @@ export function Toolbar(props: Props) {
         </MiniFlyout>
 
         <MiniFlyout
+          grid
           open={menu === 'reaction'}
           onToggle={() => {
             props.onTool('reaction')

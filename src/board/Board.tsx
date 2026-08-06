@@ -53,7 +53,11 @@ const NOTE_SIZE = 200
 const REACTION_SIZE = 64
 /** MS's note colours. */
 const NOTE_COLORS = ['#FEF7A8', '#FBD3A5', '#F9B8C0', '#C8E6C9', '#B8DCF5', '#D9C7F0', '#E8E8E8']
-const REACTIONS = ['👍', '❤️', '😀', '🎉', '😮', '😢', '🔥', '⭐']
+const REACTIONS = [
+  '👍', '👎', '❤️', '😀', '😂', '🎉',
+  '😮', '😢', '😡', '🤔', '❓', '❗',
+  '⭐', '✅', '❌', '🔥', '💡', '👏',
+]
 /** Pens whose colours seed the "recent" row in the settings popup. */
 const RECENT_SLOTS = DEFAULT_PENS.slice(0, 3)
 
