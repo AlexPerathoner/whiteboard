@@ -1,8 +1,13 @@
-# better-sqlite3 is a native module, so the build stage needs a toolchain and
-# the runtime stage must share the same base image for the compiled binding.
-FROM node:22-bookworm-slim AS build
+# better-sqlite3 ships a prebuilt binding and compiles nothing here, so the base
+# image is chosen for its glibc: the linux-arm64 prebuild needs >= 2.38, which
+# rules out bookworm (2.36). Trixie has 2.41. Both stages stay on it so the
+# binding npm downloads in the build stage still loads in the runtime stage.
+FROM node:22-trixie-slim AS build
 WORKDIR /app
 
+# npm still invokes `node-gyp rebuild` on install, and node-gyp needs Python to
+# evaluate binding.gyp even though that file resolves to a no-op target once it
+# detects the prebuild. Without these, `npm ci` fails outright.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
@@ -15,7 +20,7 @@ RUN npm run build \
   # Drop build-only dependencies before they are copied into the runtime image.
   && npm prune --omit=dev
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:22-trixie-slim AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production \

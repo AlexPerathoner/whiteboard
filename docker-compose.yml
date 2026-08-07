@@ -7,9 +7,7 @@ services:
       - "3001:3001"
     volumes:
       # Everything mutable lives here: SQLite db, board documents, thumbnails.
-      - whiteboard-data:/data
+      - ./whiteboard-data:/data
     environment:
       LOG_LEVEL: warn
 
-volumes:
-  whiteboard-data:
