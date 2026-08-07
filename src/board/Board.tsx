@@ -39,6 +39,7 @@ import { instantiate, TEMPLATE_WIDTH, type Template } from '../templates/templat
 import { TemplatePicker } from './TemplatePicker'
 import { ItemLayer } from './ItemLayer'
 import { renderThumbnail } from './thumbnail'
+import { SaveBadge, type SaveState } from './SaveBadge'
 import { Toolbar, type PenFlyout, type Tool } from './Toolbar'
 import './board.css'
 
@@ -164,12 +165,19 @@ export function Board({ boardId }: { boardId: string }) {
   /** Set by the text layer when a text element takes the pointerdown. */
   const pendingTextHit = useRef<string | null>(null)
   const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false })
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle')
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  // Mirrors `dirty` for the badge only. The ref stays the source of truth: it
+  // is read from pointer handlers and the pagehide flush, where state would be
+  // a stale closure.
+  const [unsaved, setUnsaved] = useState(false)
   const dirty = useRef(false)
   const saveTimer = useRef<number | null>(null)
 
+  /** Resolves true when the document is safely on the server. */
   const save = useCallback(async () => {
-    if (!dirty.current) return
+    if (!dirty.current) return true
+    if (saveTimer.current) clearTimeout(saveTimer.current)
     dirty.current = false
     setSaveState('saving')
     const doc: BoardDoc = {
@@ -180,19 +188,24 @@ export function Board({ boardId }: { boardId: string }) {
     }
     try {
       await api.putDoc(boardId, doc)
-      const png = await renderThumbnail(doc.strokes, doc.texts, doc.zones)
+      const png = await renderThumbnail(doc.strokes, doc.items, doc.zones)
       if (png) await api.putThumb(boardId, png)
       setSaveState('idle')
+      setLastSavedAt(Date.now())
+      setUnsaved(false)
+      return true
     } catch (err) {
       // Keep the board dirty so the next edit -- or leaving the page -- retries.
       dirty.current = true
       setSaveState('error')
       console.error('autosave failed', err)
+      return false
     }
   }, [boardId])
 
   const markDirty = useCallback(() => {
     dirty.current = true
+    setUnsaved(true)
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(save, AUTOSAVE_MS)
   }, [save])
@@ -654,10 +667,13 @@ export function Board({ boardId }: { boardId: string }) {
         if (cancelled) return
         layer.current!.setStrokes(doc.strokes ?? [])
         layer.current!.setZones(doc.zones ?? [])
-        setItems(doc.texts ?? [])
+        // `items` is what save() writes; `texts` is the pre-notes field name,
+        // still read so boards saved before the rename keep their text.
+        setItems(doc.items ?? doc.texts ?? [])
         // Loading is not an edit, and the freshly loaded state is not undoable.
         history.current!.clear()
         dirty.current = false
+        setUnsaved(false)
       })
     return () => {
       cancelled = true
@@ -679,9 +695,22 @@ export function Board({ boardId }: { boardId: string }) {
         new Blob([JSON.stringify(doc)], { type: 'application/json' }),
       )
     }
+    // The beacon above is best-effort and silent; this asks first. A clean
+    // board never prompts, and a failed save leaves `dirty` true, so the ref
+    // alone is the whole condition -- read at fire time, so the dep list below
+    // must stay [boardId]. Adding saveState there would re-run this effect on
+    // every save, and its cleanup clears the pending autosave timer: edits made
+    // while a save was in flight would silently lose their write-back.
+    // Prompting costs the page its bfcache entry; that is inherent to asking.
+    const confirmExit = (e: BeforeUnloadEvent) => {
+      if (!dirty.current) return
+      e.preventDefault()
+    }
     addEventListener('pagehide', flush)
+    addEventListener('beforeunload', confirmExit)
     return () => {
       removeEventListener('pagehide', flush)
+      removeEventListener('beforeunload', confirmExit)
       flush()
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
@@ -1081,10 +1110,18 @@ export function Board({ boardId }: { boardId: string }) {
         />
       </div>
 
-      <button className="back" onClick={() => navigate('/')} title="All whiteboards">
-        ← <span className={`save save-${saveState}`}>
-          {saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save failed' : 'Saved'}
-        </span>
+      <button
+        className="back"
+        // Leaving flushes the debounce through the real save rather than the
+        // pagehide beacon, which skips the thumbnail and would leave the
+        // dashboard showing a stale tile. A failed save keeps us on the board
+        // so "Save failed" stays visible instead of being hidden behind it.
+        onClick={async () => {
+          if (await save()) navigate('/')
+        }}
+        title="All whiteboards"
+      >
+        ← <SaveBadge saveState={saveState} lastSavedAt={lastSavedAt} unsaved={unsaved} />
       </button>
 
       <Toolbar

@@ -348,6 +348,7 @@
 }
 .board .back:hover { background: #f3f2f1; }
 .board .save { font-size: 12px; color: #605e5c; }
+.board .save-unsaved { color: #8a6d00; }
 .board .save-error { color: #c10051; font-weight: 600; }
 
 .stage.tool-eraser { cursor: none; }
