@@ -27,6 +27,14 @@ All state lives in one directory (`./whiteboard-data` by default): a SQLite
 database for board and folder metadata, plus one JSON document and one PNG
 thumbnail per board. Back it up by copying that directory. `DATA_DIR` moves it.
 
+The container takes ownership of that directory on start, so it ends up owned
+by uid 1000 rather than by your host account. To keep it owned by a specific
+user, pin that uid in `docker-compose.yml` and make the directory match:
+
+```yaml
+user: "1001:1001"      # then: chown -R 1001:1001 ./whiteboard-data
+```
+
 There is **no authentication** — this is built for a single user on a trusted
 network. Put a reverse proxy in front of it if it needs to be reachable from
 anywhere else.

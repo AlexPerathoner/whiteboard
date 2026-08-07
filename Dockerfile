@@ -33,12 +33,19 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
 COPY package.json ./
 
-RUN mkdir -p /data && chown -R node:node /data /app
-USER node
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN mkdir -p /data && chown -R node:node /data /app && chmod +x /usr/local/bin/entrypoint.sh
+
+# Deliberately no `USER node`: the entrypoint starts as root purely to fix the
+# ownership of a bind-mounted /data, then drops to node before exec'ing the
+# server. Given its own name so it does not shadow the node image's entrypoint.
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 EXPOSE 3001
 VOLUME ["/data"]
 
+# Runs as root, since HEALTHCHECK has no user field and the image no longer
+# pins one. It only performs a fetch, so that costs nothing.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/api/boards').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
 
