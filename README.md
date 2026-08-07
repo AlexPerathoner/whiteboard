@@ -363,28 +363,16 @@ frontend bundle.
 All state is under `/data` (SQLite db, board documents, thumbnails), mounted as
 a named volume. `DATA_DIR` relocates it.
 
-### Optional password
+### No authentication
 
-Set `APP_PASSWORD` (and optionally `APP_USER`, default `whiteboard`) to require
-HTTP Basic auth on every request. It is off by default.
+There is none, by design: this is a local, single-user board. An earlier
+optional HTTP Basic gate was removed rather than left half-safe -- the
+`pagehide` autosave flush uses `navigator.sendBeacon`, which cannot carry an
+`Authorization` header, so with the gate on a close-tab flush silently 401'd
+and lost the last edits.
 
-**Basic auth is base64, not encryption.** It is appropriate for a board on a
-trusted LAN. Anything reachable from the internet should sit behind a reverse
-proxy terminating TLS — this app does not do TLS itself.
-
-Verified: 401 with no credentials, 401 on a wrong password, 401 on a wrong
-username, 200 with the right pair, and the comparison is constant-time. The
-gate covers the frontend too — an unauthenticated `/` returns 401 *with* a
-`WWW-Authenticate` header, so the browser prompts and then sends credentials
-on the asset requests (checked: asset 401 without credentials, 200 with).
-
-**Known conflict with the autosave beacon.** The `pagehide` flush uses
-`navigator.sendBeacon`, which cannot carry an `Authorization` header. With
-`APP_PASSWORD` set, a close-tab flush 401s silently and those last edits are
-lost — the exact case the beacon exists to prevent. Beacons *do* send cookies,
-so fixing it properly means a cookie session rather than Basic auth. Until
-then: with the password gate on, leave a board through the back button (which
-lets the normal debounced save run) rather than by closing the tab mid-edit.
+Anything reachable beyond a trusted network needs a reverse proxy in front,
+terminating TLS and handling auth there.
 
 ### Not verified
 
