@@ -10,4 +10,9 @@ services:
       - ./whiteboard-data:/data
     environment:
       LOG_LEVEL: warn
+    networks:
+      - nginxproxymanager_default
 
+networks:
+  nginxproxymanager_default:
+    external: true

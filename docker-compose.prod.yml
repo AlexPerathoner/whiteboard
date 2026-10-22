@@ -1,6 +1,7 @@
 services:
   whiteboard:
     build: .
+    hostname: whiteboard
     image: whiteboard:latest
     restart: unless-stopped
     expose:
